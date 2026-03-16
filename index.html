@@ -83,6 +83,11 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
 .fv{font-size:15px;font-weight:600;font-family:'DM Mono',monospace;}
 .fc{padding:5px 12px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--t3);cursor:pointer;font-size:12px;font-weight:500;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .fc.active{border-color:var(--accent);color:var(--accent);background:var(--al);}
+.fc-claude{border-color:var(--accent);color:var(--accent);background:var(--al);font-weight:600;}
+.fc-claude.active{background:var(--accent);color:#fff;}
+.progress-bar{width:100%;background:var(--s2);border-radius:999px;height:6px;margin:8px 0;}
+.progress-fill{height:6px;border-radius:999px;background:var(--accent);transition:width .3s;}
+.scan-status{font-size:12px;color:var(--t3);margin-top:6px;}
 </style>
 </head>
 <body>
@@ -98,6 +103,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
 </nav>
 <main class="mn">
  
+  <!-- ANALYZER -->
   <div id="analyzer" class="pg active">
     <div class="sr">
       <input id="inp" type="text" placeholder="NSE symbol — RELIANCE, TCS, INFY, HDFCBANK, WIPRO, ITC..." onkeydown="if(event.key==='Enter')doSearch()">
@@ -160,6 +166,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     </div>
   </div>
  
+  <!-- WATCHLIST -->
   <div id="watchlist" class="pg">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <h3 style="font-size:16px;font-weight:600;">Watchlist <span id="wl-c" style="font-size:13px;font-weight:400;color:var(--t3);"></span></h3>
@@ -168,23 +175,32 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     <div class="cd cf" id="wl-list"><div class="em">No stocks yet.</div></div>
   </div>
  
+  <!-- SCREENER -->
   <div id="screener" class="pg">
-    <div style="margin-bottom:1rem;"><h3 style="font-size:16px;font-weight:600;margin-bottom:.3rem;">Stock Screener</h3><p style="font-size:13px;color:var(--t3);">Screens Nifty 50 stocks.</p></div>
+    <div style="margin-bottom:1rem;">
+      <h3 style="font-size:16px;font-weight:600;margin-bottom:.3rem;">Stock Screener</h3>
+      <p style="font-size:13px;color:var(--t3);">Screens Nifty 50 stocks based on your filters.</p>
+    </div>
     <div class="cd">
-      <div class="ct">Filters</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;">
+      <div class="ct">Select filters</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1.2rem;">
+        <button class="fc" data-f="claude" onclick="toggleClaudeFilter(this)">🤖 Claude Recommended</button>
         <button class="fc" data-f="52wh" onclick="this.classList.toggle('active')">Near 52W High</button>
         <button class="fc" data-f="52wl" onclick="this.classList.toggle('active')">Near 52W Low</button>
-        <button class="fc" data-f="rsi_low" onclick="this.classList.toggle('active')">RSI &lt; 40</button>
-        <button class="fc" data-f="rsi_high" onclick="this.classList.toggle('active')">RSI &gt; 60</button>
+        <button class="fc" data-f="rsi_low" onclick="this.classList.toggle('active')">RSI &lt; 40 (Oversold)</button>
+        <button class="fc" data-f="rsi_high" onclick="this.classList.toggle('active')">RSI &gt; 60 (Overbought)</button>
         <button class="fc" data-f="uptrend" onclick="this.classList.toggle('active')">Strong Uptrend</button>
         <button class="fc" data-f="downtrend" onclick="this.classList.toggle('active')">Downtrend</button>
+      </div>
+      <div id="claude-note" style="display:none;background:var(--al);border:1px solid var(--accent);border-radius:var(--rs);padding:.8rem 1rem;margin-bottom:1rem;font-size:13px;color:var(--t2);">
+        🤖 <strong style="color:var(--accent);">Claude Recommended</strong> — scans all Nifty 50 stocks, runs full AI analysis on each, and shows only those with a <strong>BUY</strong> verdict. Scores trend, momentum, volume and R:R ratio. Takes 1–2 minutes.
       </div>
       <button class="btn bp" onclick="runScreener()">Run Screener</button>
     </div>
     <div id="sc-out"></div>
   </div>
  
+  <!-- NOTES -->
   <div id="notes" class="pg">
     <h3 style="font-size:16px;font-weight:600;margin-bottom:1rem;">My Stock Notes</h3>
     <div id="all-notes"></div>
@@ -209,36 +225,80 @@ let CHS   = {};
  
 function save(){ localStorage.setItem('hh_wl6',JSON.stringify(wl)); localStorage.setItem('hh_nt6',JSON.stringify(notes)); }
  
-// ── FETCH via our own Vercel backend API ──
+// ── FETCH via Vercel backend ──
 async function fetchStock(symbol){
-  try {
+  try{
     const r = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);
     const d = await r.json();
     if(d?.chart?.result?.[0]) return parseYahoo(d);
-  } catch(e){}
+  }catch(e){}
   return null;
 }
  
 function parseYahoo(data){
-  const res  = data.chart.result[0];
-  const meta = res.meta;
-  const ts   = res.timestamp || [];
-  const q    = res.indicators.quote[0];
-  const closes  = q.close  || [];
-  const highs   = q.high   || [];
-  const lows    = q.low    || [];
-  const volumes = q.volume || [];
-  const idx = ts.map((_,i)=>i).filter(i=>closes[i]!=null);
-  return {
-    dates:   idx.map(i=>new Date(ts[i]*1000).toISOString().split('T')[0]),
-    closes:  idx.map(i=>closes[i]),
-    highs:   idx.map(i=>highs[i]||closes[i]),
-    lows:    idx.map(i=>lows[i]||closes[i]),
-    volumes: idx.map(i=>volumes[i]||0),
+  const res=data.chart.result[0], meta=res.meta;
+  const ts=res.timestamp||[], q=res.indicators.quote[0];
+  const closes=q.close||[], highs=q.high||[], lows=q.low||[], volumes=q.volume||[];
+  const idx=ts.map((_,i)=>i).filter(i=>closes[i]!=null);
+  return{
+    dates:  idx.map(i=>new Date(ts[i]*1000).toISOString().split('T')[0]),
+    closes: idx.map(i=>closes[i]),
+    highs:  idx.map(i=>highs[i]||closes[i]),
+    lows:   idx.map(i=>lows[i]||closes[i]),
+    volumes:idx.map(i=>volumes[i]||0),
     meta
   };
 }
  
+// ── TECHNICALS ──
+const SMA=(d,p)=>d.map((v,i)=>i<p-1?null:d.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);
+const EMA=(d,p)=>{const k=2/(p+1);return d.reduce((a,v,i)=>{a.push(i===0?v:v*k+a[i-1]*(1-k));return a;},[]);};
+function RSI(d,p=14){const r=Array(p).fill(null);for(let i=p;i<d.length;i++){let g=0,l=0;for(let j=i-p;j<i;j++){const x=d[j+1]-d[j];x>0?g+=x:l-=x;}const ag=g/p,al=l/p;r.push(al===0?100:100-(100/(1+ag/al)));}return r;}
+function MACD(d){const m=EMA(d,12).map((v,i)=>v-EMA(d,26)[i]);const s=EMA(m,9);return{m,s,h:m.map((v,i)=>v-s[i])};}
+function BB(d,p=20,x=2){const sm=SMA(d,p);return d.map((v,i)=>{if(i<p-1)return{u:null,l:null};const sl=d.slice(i-p+1,i+1),mean=sm[i],std=Math.sqrt(sl.reduce((a,b)=>a+(b-mean)**2,0)/p);return{u:mean+x*std,l:mean-x*std};});}
+function ATR(hi,lo,cls,p=14){const tr=hi.map((h,i)=>i===0?h-lo[i]:Math.max(h-lo[i],Math.abs(h-cls[i-1]),Math.abs(lo[i]-cls[i-1])));return tr.slice(-p).reduce((a,b)=>a+b,0)/p;}
+ 
+// ── AI SCORE (same logic as AI Analysis button) ──
+function getAIScore(d){
+  const cls=d.closes, hi=d.highs, lo=d.lows, vol=d.volumes;
+  if(!cls||cls.length<20) return null;
+  const price=cls[cls.length-1];
+  const rv=RSI(cls); const rsiV=rv.filter(v=>v!=null).slice(-1)[0]||50;
+  const ma20V=SMA(cls,20).filter(v=>v!=null).slice(-1)[0]||price;
+  const ma50V=SMA(cls,50).filter(v=>v!=null).slice(-1)[0]||price;
+  const ma200V=SMA(cls,Math.min(200,cls.length)).filter(v=>v!=null).slice(-1)[0]||price;
+  const mv=MACD(cls);
+  const macdV=mv.m[mv.m.length-1]||0, sigV=mv.s[mv.s.length-1]||0;
+  const atrV=ATR(hi,lo,cls);
+  const avgVol=vol.slice(-10).reduce((a,b)=>a+b,0)/10||1;
+  const volSp=vol[vol.length-1]/avgVol;
+  const support=Math.min(...lo.slice(-20))*1.01;
+  const resist=Math.max(...hi.slice(-20))*.99;
+  const exitTgt=Math.min(resist*1.05,price*1.12);
+  const sl=price-atrV*1.5;
+  const riskP=(price-sl)/price*100;
+  const rewP=(exitTgt-price)/price*100;
+  const rr=rewP/riskP;
+ 
+  let sc=0;
+  if(price>ma200V)sc+=2; if(price>ma50V)sc+=1; if(price>ma20V)sc+=1;
+  if(rsiV<70&&rsiV>30)sc+=1; if(rsiV<50)sc-=1; if(rsiV<35)sc+=1;
+  if(macdV>sigV)sc+=2; else sc-=1;
+  if(volSp>1.5)sc+=1; if(rr>=2)sc+=1;
+ 
+  const verdict=sc>=6?'BUY':sc>=3?'HOLD':'AVOID';
+  const entryLow=Math.max(support,price*(rsiV>65?.95:.97));
+  const entryHigh=price*(rsiV>65?.99:1.01);
+ 
+  return{
+    verdict, score:sc, price, rsiV, macdBull:macdV>sigV,
+    trend:price>ma200V&&price>ma50V?'Strong Uptrend':price>ma200V?'Moderate Uptrend':price<ma200V&&price<ma50V?'Downtrend':'Sideways',
+    entryLow, entryHigh, exitTgt, sl,
+    riskP:riskP.toFixed(1), rewP:rewP.toFixed(1), rr:rr.toFixed(1)
+  };
+}
+ 
+// ── NAV ──
 function go(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
@@ -248,26 +308,21 @@ function go(id){
   if(id==='notes') renderNotes();
 }
  
+// ── SEARCH ──
 async function doSearch(){
-  const raw = document.getElementById('inp').value.trim().toUpperCase().replace(/\.(NS|BO)$/,'');
+  const raw=document.getElementById('inp').value.trim().toUpperCase().replace(/\.(NS|BO)$/,'');
   if(!raw) return;
-  sym = raw;
+  sym=raw;
   showMsg(`<div style="padding:2rem;text-align:center;"><div class="sp"></div><br><br><span style="color:var(--t3);">Loading ${raw}...</span></div>`);
-  const data = await fetchStock(raw);
+  const data=await fetchStock(raw);
   if(!data||!data.closes.length){
-    showMsg(`<div class="em"><strong>Could not load "${raw}"</strong><br><br>Make sure you typed the correct NSE symbol.<br><br>Examples: RELIANCE, TCS, INFY, HDFCBANK, ITC, WIPRO, SBIN, TATAMOTORS</div>`);
+    showMsg(`<div class="em"><strong>Could not load "${raw}"</strong><br><br>Check the NSE symbol is correct.<br>Examples: RELIANCE, TCS, INFY, HDFCBANK, ITC, WIPRO</div>`);
     return;
   }
-  full = data;
-  renderView(data, 132);
+  full=data; renderView(data,132);
 }
  
-function showMsg(html){
-  document.getElementById('a-empty').innerHTML = html;
-  document.getElementById('a-empty').style.display = 'block';
-  document.getElementById('a-main').style.display  = 'none';
-}
- 
+function showMsg(html){ document.getElementById('a-empty').innerHTML=html; document.getElementById('a-empty').style.display='block'; document.getElementById('a-main').style.display='none'; }
 function sliceD(d,n){ const s=Math.max(0,d.closes.length-n); return{dates:d.dates.slice(s),closes:d.closes.slice(s),highs:d.highs.slice(s),lows:d.lows.slice(s),volumes:d.volumes.slice(s)}; }
  
 function renderView(d,days){
@@ -278,8 +333,8 @@ function renderView(d,days){
   const w52h=d.meta?.fiftyTwoWeekHigh||Math.max(...cls.slice(-252));
   const w52l=d.meta?.fiftyTwoWeekLow||Math.min(...cls.slice(-252));
  
-  document.getElementById('s-sym').textContent  =sym;
-  document.getElementById('s-name').textContent =d.meta?.longName||d.meta?.shortName||sym;
+  document.getElementById('s-sym').textContent=sym;
+  document.getElementById('s-name').textContent=d.meta?.longName||d.meta?.shortName||sym;
   document.getElementById('s-price').textContent='₹'+price.toFixed(2);
   const ce=document.getElementById('s-chg');
   ce.textContent=(chg>=0?'+':'')+chg.toFixed(2)+' ('+(chgP>=0?'+':'')+chgP.toFixed(2)+'%)';
@@ -318,13 +373,6 @@ function renderFund(meta){
     ${fi('Currency',meta.currency||'INR')}
   `;
 }
- 
-const SMA=(d,p)=>d.map((v,i)=>i<p-1?null:d.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);
-const EMA=(d,p)=>{const k=2/(p+1);return d.reduce((a,v,i)=>{a.push(i===0?v:v*k+a[i-1]*(1-k));return a;},[]);};
-function RSI(d,p=14){const r=Array(p).fill(null);for(let i=p;i<d.length;i++){let g=0,l=0;for(let j=i-p;j<i;j++){const x=d[j+1]-d[j];x>0?g+=x:l-=x;}const ag=g/p,al=l/p;r.push(al===0?100:100-(100/(1+ag/al)));}return r;}
-function MACD(d){const m=EMA(d,12).map((v,i)=>v-EMA(d,26)[i]);const s=EMA(m,9);return{m,s,h:m.map((v,i)=>v-s[i])};}
-function BB(d,p=20,x=2){const sm=SMA(d,p);return d.map((v,i)=>{if(i<p-1)return{u:null,l:null};const sl=d.slice(i-p+1,i+1),mean=sm[i],std=Math.sqrt(sl.reduce((a,b)=>a+(b-mean)**2,0)/p);return{u:mean+x*std,l:mean-x*std};});}
-function ATR(hi,lo,cls,p=14){const tr=hi.map((h,i)=>i===0?h-lo[i]:Math.max(h-lo[i],Math.abs(h-cls[i-1]),Math.abs(lo[i]-cls[i-1])));return tr.slice(-p).reduce((a,b)=>a+b,0)/p;}
  
 function buildCharts(d){
   const cls=d.closes,hi=d.highs,lo=d.lows,vol=d.volumes;
@@ -372,57 +420,150 @@ function tf(days,btn){
   if(full) buildCharts(sliceD(full,days));
 }
  
+// ── AI ANALYSIS BUTTON ──
 function runAI(){
   const btn=document.getElementById('ai-btn');const box=document.getElementById('ai-out');
   const ind=window._ind;if(!ind)return;
   btn.disabled=true;btn.innerHTML='<span class="sp"></span> Analysing...';
-  const cls=ind.cls,hi=ind.hi,lo=ind.lo,vol=ind.vol;
-  const price=cls[cls.length-1];
-  const rsiV=ind.rv.filter(v=>v!=null).slice(-1)[0]||50;
-  const ma20V=ind.ma20.filter(v=>v!=null).slice(-1)[0]||price;
-  const ma50V=ind.ma50.filter(v=>v!=null).slice(-1)[0]||price;
-  const ma200V=ind.ma200.filter(v=>v!=null).slice(-1)[0]||price;
-  const macdV=ind.mv.m[ind.mv.m.length-1]||0;
-  const sigV=ind.mv.s[ind.mv.s.length-1]||0;
-  const atrV=ATR(hi,lo,cls);
-  const avgVol=vol.slice(-10).reduce((a,b)=>a+b,0)/10||1;
-  const volSp=vol[vol.length-1]/avgVol;
-  const support=Math.min(...lo.slice(-20))*1.01;
-  const resist=Math.max(...hi.slice(-20))*.99;
-  const entryLow=Math.max(support,price*(rsiV>65?.95:.97));
-  const entryHigh=price*(rsiV>65?.99:1.01);
-  const exitTgt=Math.min(resist*1.05,price*1.12);
-  const sl=price-atrV*1.5;
-  const riskP=((price-sl)/price*100).toFixed(1);
-  const rewP=((exitTgt-price)/price*100).toFixed(1);
-  const rr=(parseFloat(rewP)/parseFloat(riskP)).toFixed(1);
-  const trend=price>ma200V&&price>ma50V?'Strong Uptrend':price>ma200V?'Moderate Uptrend':price<ma200V&&price<ma50V?'Downtrend':'Sideways';
-  let sc=0;
-  if(price>ma200V)sc+=2;if(price>ma50V)sc+=1;if(price>ma20V)sc+=1;
-  if(rsiV<70&&rsiV>30)sc+=1;if(rsiV<50)sc-=1;if(rsiV<35)sc+=1;
-  if(macdV>sigV)sc+=2;else sc-=1;
-  if(volSp>1.5)sc+=1;if(parseFloat(rr)>=2)sc+=1;
-  const v=sc>=6?'BUY':sc>=3?'HOLD':'AVOID';
-  const vc=v==='BUY'?'vbu':v==='HOLD'?'vho':'vav';
-  const vco=v==='BUY'?'var(--green)':v==='HOLD'?'var(--amber)':'var(--red)';
-  const vr={BUY:`Strong alignment — trend, momentum and volume support entry. R:R of ${rr}:1 is favorable.`,HOLD:`Mixed signals. Not enough confirmation for confident entry. Watch for clearer setup.`,AVOID:`Indicators mostly negative. Wait for conditions to improve.`};
+  const ai=getAIScore(full);
+  if(!ai){btn.disabled=false;btn.innerHTML='🤖 AI Analysis';return;}
   btn.disabled=false;btn.innerHTML='🤖 AI Analysis';
   box.style.display='block';
+  const vc=ai.verdict==='BUY'?'vbu':ai.verdict==='HOLD'?'vho':'vav';
+  const vco=ai.verdict==='BUY'?'var(--green)':ai.verdict==='HOLD'?'var(--amber)':'var(--red)';
+  const vr={BUY:`Strong alignment — trend, momentum and volume support entry. R:R of ${ai.rr}:1 is favorable.`,HOLD:`Mixed signals. Not enough confirmation for confident entry. Watch for clearer setup.`,AVOID:`Indicators mostly negative. Wait for conditions to improve.`};
+  const price=full.closes[full.closes.length-1];
+  const ma200V=window._ind.ma200.filter(v=>v!=null).slice(-1)[0]||price;
+  const ma50V=window._ind.ma50.filter(v=>v!=null).slice(-1)[0]||price;
+  const rsiV=window._ind.rv.filter(v=>v!=null).slice(-1)[0]||50;
+  const macdV=window._ind.mv.m[window._ind.mv.m.length-1]||0;
+  const sigV=window._ind.mv.s[window._ind.mv.s.length-1]||0;
+  const atrV=ATR(full.highs,full.lows,full.closes);
+  const volSp=full.volumes[full.volumes.length-1]/(full.volumes.slice(-10).reduce((a,b)=>a+b,0)/10||1);
   box.innerHTML=`<div class="aib">
     <div class="ait">🤖 AI Analysis — ${sym}</div>
-    <div class="${vc}"><div class="vt" style="color:${vco};">${v}</div><div class="vr">${vr[v]}</div></div>
+    <div class="${vc}"><div class="vt" style="color:${vco};">${ai.verdict}</div><div class="vr">${vr[ai.verdict]}</div></div>
     <div class="th" style="margin-bottom:1.2rem;">
-      <div class="zb"><div class="zl">📥 Entry zone</div><div class="zv" style="color:var(--green);">₹${entryLow.toFixed(0)} – ₹${entryHigh.toFixed(0)}</div><div style="font-size:11px;color:var(--t3);margin-top:4px;">Preferred buying range</div></div>
-      <div class="zb"><div class="zl">🎯 Target / Exit</div><div class="zv" style="color:var(--accent);">₹${exitTgt.toFixed(0)}</div><div style="font-size:11px;color:var(--t3);margin-top:4px;">+${rewP}% upside potential</div></div>
-      <div class="zb"><div class="zl">🛑 Stop Loss</div><div class="zv" style="color:var(--red);">₹${sl.toFixed(0)}</div><div style="font-size:11px;color:var(--t3);margin-top:4px;">-${riskP}% risk | R:R = ${rr}:1</div></div>
+      <div class="zb"><div class="zl">📥 Entry zone</div><div class="zv" style="color:var(--green);">₹${ai.entryLow.toFixed(0)} – ₹${ai.entryHigh.toFixed(0)}</div><div style="font-size:11px;color:var(--t3);margin-top:4px;">Preferred buying range</div></div>
+      <div class="zb"><div class="zl">🎯 Target / Exit</div><div class="zv" style="color:var(--accent);">₹${ai.exitTgt.toFixed(0)}</div><div style="font-size:11px;color:var(--t3);margin-top:4px;">+${ai.rewP}% upside potential</div></div>
+      <div class="zb"><div class="zl">🛑 Stop Loss</div><div class="zv" style="color:var(--red);">₹${ai.sl.toFixed(0)}</div><div style="font-size:11px;color:var(--t3);margin-top:4px;">-${ai.riskP}% risk | R:R = ${ai.rr}:1</div></div>
     </div>
-    <div class="ais"><div class="aist">📈 Trend</div><p>${sym} is in a <strong>${trend}</strong>. Price ₹${price.toFixed(0)} is ${price>ma200V?'<span style="color:var(--green)">above</span>':'<span style="color:var(--red)">below</span>'} 200MA (₹${ma200V.toFixed(0)}), ${price>ma50V?'<span style="color:var(--green)">above</span>':'<span style="color:var(--red)">below</span>'} 50MA (₹${ma50V.toFixed(0)}). ${volSp>1.5?`<strong style="color:var(--green)">Volume ${volSp.toFixed(1)}× above average</strong> — strong conviction.`:volSp<0.7?'Volume below average.':'Volume near average.'}</p></div>
+    <div class="ais"><div class="aist">📈 Trend</div><p>${sym} is in a <strong>${ai.trend}</strong>. Price ₹${price.toFixed(0)} is ${price>ma200V?'<span style="color:var(--green)">above</span>':'<span style="color:var(--red)">below</span>'} 200MA (₹${ma200V.toFixed(0)}), ${price>ma50V?'<span style="color:var(--green)">above</span>':'<span style="color:var(--red)">below</span>'} 50MA (₹${ma50V.toFixed(0)}). ${volSp>1.5?`<strong style="color:var(--green)">Volume ${volSp.toFixed(1)}× above average</strong> — strong conviction.`:volSp<0.7?'Volume below average.':'Volume near average.'}</p></div>
     <div class="ais"><div class="aist">⚡ Momentum</div><p>RSI <strong style="color:${rsiV<30?'var(--green)':rsiV>70?'var(--red)':'var(--text)'}">${rsiV.toFixed(1)}</strong> — ${rsiV<30?'<strong>Oversold</strong>, good accumulation zone':rsiV>70?'<strong>Overbought</strong>, risk of pullback':'neutral zone'}. MACD <strong style="color:${macdV>sigV?'var(--green)':'var(--red)'}">${macdV>sigV?'bullish':'bearish'}</strong> cross.</p></div>
-    <div class="ais"><div class="aist">🏗️ Key Levels</div><p>Support ₹${support.toFixed(0)} · Resistance ₹${resist.toFixed(0)} · ATR ₹${atrV.toFixed(0)}/day · SL placed 1.5× ATR below price.</p></div>
+    <div class="ais"><div class="aist">🏗️ Key Levels</div><p>ATR ₹${atrV.toFixed(0)}/day · SL placed 1.5× ATR below current price for breathing room.</p></div>
     <div style="font-size:11px;color:var(--t3);margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border);">⚠️ Technical analysis only. Not financial advice.</div>
   </div>`;
 }
  
+// ── SCREENER ──
+function toggleClaudeFilter(btn){
+  btn.classList.toggle('active');
+  document.getElementById('claude-note').style.display = btn.classList.contains('active') ? 'block' : 'none';
+}
+ 
+const NIFTY50=['RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','ITC','WIPRO','SBIN','LT','AXISBANK','BAJFINANCE','KOTAKBANK','MARUTI','TITAN','SUNPHARMA','NESTLEIND','ASIANPAINT','HCLTECH','TECHM','ULTRACEMCO','POWERGRID','NTPC','ONGC','TATAMOTORS','TATASTEEL','JSWSTEEL','COALINDIA','DIVISLAB','DRREDDY','CIPLA','EICHERMOT','HEROMOTOCO','HINDALCO','BAJAJ-AUTO','BRITANNIA','ADANIPORTS','GRASIM','M&M','BPCL','INDUSINDBK','APOLLOHOSP','TATACONSUM','UPL','BAJAJFINSV','SBILIFE','HDFCLIFE','LTIM','ADANIENT','SHREECEM','HINDUNILVR'];
+ 
+async function runScreener(){
+  const af=[...document.querySelectorAll('.fc.active')].map(b=>b.dataset.f);
+  if(!af.length) return alert('Select at least one filter.');
+  const isClaudeMode = af.includes('claude');
+  const el=document.getElementById('sc-out');
+  const total = NIFTY50.length;
+  let scanned = 0;
+ 
+  el.innerHTML=`<div class="cd">
+    <div style="padding:.5rem 0;">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:.5rem;" id="scan-txt">${isClaudeMode?'🤖 Running AI analysis on Nifty 50':'Scanning Nifty 50'}... <span id="scan-count">0/${total}</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="scan-prog" style="width:0%"></div></div>
+    </div>
+  </div>`;
+ 
+  const res=[];
+  for(const s of NIFTY50){
+    const d=await fetchStock(s);
+    scanned++;
+    const pct=Math.round(scanned/total*100);
+    const progEl=document.getElementById('scan-prog');
+    const countEl=document.getElementById('scan-count');
+    if(progEl) progEl.style.width=pct+'%';
+    if(countEl) countEl.textContent=`${scanned}/${total}`;
+ 
+    if(!d||!d.closes||d.closes.length<20){ await new Promise(r=>setTimeout(r,200)); continue; }
+ 
+    const cls=d.closes,hi=d.highs,lo=d.lows;
+    const price=cls[cls.length-1];
+    const w52h=Math.max(...cls.slice(-252)),w52l=Math.min(...cls.slice(-252));
+    const rv=RSI(cls);const rsiV=rv.filter(v=>v!=null).slice(-1)[0]||50;
+    const ma200v=SMA(cls,Math.min(200,cls.length)).filter(v=>v!=null).slice(-1)[0]||0;
+    const prev=cls[cls.length-2]||price;const chgP=((price-prev)/prev)*100;
+ 
+    let pass=true;
+ 
+    if(isClaudeMode){
+      // Claude mode: only show BUY recommendations
+      const ai=getAIScore(d);
+      if(!ai||ai.verdict!=='BUY') pass=false;
+      if(pass) res.push({s,price,chgP,rsiV,w52h,ai,claudeMode:true});
+    } else {
+      if(af.includes('52wh')&&!(price>=w52h*.97))pass=false;
+      if(af.includes('52wl')&&!(price<=w52l*1.03))pass=false;
+      if(af.includes('rsi_low')&&!(rsiV<40))pass=false;
+      if(af.includes('rsi_high')&&!(rsiV>60))pass=false;
+      if(af.includes('uptrend')&&!(price>ma200v&&chgP>0))pass=false;
+      if(af.includes('downtrend')&&!(price<ma200v&&chgP<0))pass=false;
+      if(pass)res.push({s,price,chgP,rsiV,w52h,claudeMode:false});
+    }
+    await new Promise(r=>setTimeout(r,200));
+  }
+ 
+  if(!res.length){
+    el.innerHTML=`<div class="cd"><div class="em">${isClaudeMode?'No stocks got a BUY verdict right now. Market conditions may not be favorable — check back tomorrow.':'No stocks matched your filters.'}</div></div>`;
+    return;
+  }
+ 
+  if(isClaudeMode){
+    // Claude mode — rich cards with entry/exit/SL
+    el.innerHTML=`
+      <div style="margin-bottom:.8rem;font-size:13px;color:var(--t2);">🤖 <strong style="color:var(--accent);">${res.length} stocks</strong> got a BUY recommendation out of ${total} scanned.</div>
+      ${res.map(r=>`
+      <div class="cd" style="border-left:3px solid var(--green);margin-bottom:.8rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.8rem;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <strong style="font-family:'DM Mono',monospace;font-size:16px;color:var(--accent);">${r.s}</strong>
+            <span class="bdg bg">BUY</span>
+            <span style="font-size:12px;color:var(--t3);">Score: ${r.ai.score}/10</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <span style="font-family:'DM Mono',monospace;font-size:16px;font-weight:600;">₹${r.price.toFixed(2)}</span>
+            <span class="${r.chgP>=0?'up':'dn'}" style="font-size:12px;">${r.chgP>=0?'+':''}${r.chgP.toFixed(2)}%</span>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:.8rem;">
+          <div class="fi"><div class="fll">Entry zone</div><div class="fv" style="color:var(--green);font-size:13px;">₹${r.ai.entryLow.toFixed(0)}–₹${r.ai.entryHigh.toFixed(0)}</div></div>
+          <div class="fi"><div class="fll">Target</div><div class="fv" style="color:var(--accent);font-size:13px;">₹${r.ai.exitTgt.toFixed(0)} (+${r.ai.rewP}%)</div></div>
+          <div class="fi"><div class="fll">Stop Loss</div><div class="fv" style="color:var(--red);font-size:13px;">₹${r.ai.sl.toFixed(0)} (-${r.ai.riskP}%)</div></div>
+          <div class="fi"><div class="fll">R:R Ratio</div><div class="fv" style="font-size:13px;">${r.ai.rr}:1</div></div>
+          <div class="fi"><div class="fll">RSI</div><div class="fv" style="color:${r.rsiV<40?'var(--green)':r.rsiV>60?'var(--red)':'var(--text)'};font-size:13px;">${r.rsiV.toFixed(0)}</div></div>
+          <div class="fi"><div class="fll">Trend</div><div class="fv" style="font-size:11px;color:var(--green);">${r.ai.trend}</div></div>
+        </div>
+        <button class="btn bs bp" onclick="loadSym('${r.s}')">Full Analysis →</button>
+      </div>`).join('')}
+      <div style="font-size:11px;color:var(--t3);margin-top:.5rem;">⚠️ Technical analysis only. Not financial advice. Always do your own research.</div>
+    `;
+  } else {
+    el.innerHTML='<div class="cd cf"><table><thead><tr><th>Symbol</th><th>Price</th><th>Change</th><th>RSI</th><th>52W High</th><th>Action</th></tr></thead><tbody>'+
+      res.map(r=>`<tr>
+        <td><strong style="color:var(--accent);font-family:'DM Mono',monospace;">${r.s}</strong></td>
+        <td>₹${r.price.toFixed(2)}</td>
+        <td class="${r.chgP>=0?'up':'dn'}">${r.chgP>=0?'+':''}${r.chgP.toFixed(2)}%</td>
+        <td style="color:${r.rsiV<40?'var(--green)':r.rsiV>60?'var(--red)':'var(--text)'}">${r.rsiV.toFixed(0)}</td>
+        <td>₹${r.w52h.toFixed(0)}</td>
+        <td><button class="btn bs bp" onclick="loadSym('${r.s}')">Analyse →</button></td>
+      </tr>`).join('')+'</tbody></table></div>';
+  }
+}
+ 
+// ── WATCHLIST ──
 function addWL(){
   if(!sym){document.getElementById('wl-inp').value='';document.getElementById('wl-mo').classList.add('open');return;}
   if(wl.length>=20)return alert('Watchlist full (max 20).');
@@ -443,13 +584,13 @@ async function loadWLPrices(){
   document.getElementById('wl-c').textContent=`(${wl.length}/20)`;
   if(!wl.length){el.innerHTML='<div class="em">No stocks yet.</div>';return;}
   el.innerHTML=wl.map(s=>`<div class="wi" id="wi-${s}">
-    <span class="wsm">${s}</span><span style="flex:1;font-size:12px;color:var(--t3);"><span class="sp"></span></span>
+    <span class="wsm">${s}</span><span style="flex:1;"><span class="sp"></span></span>
     <button class="btn bs bd" onclick="event.stopPropagation();removeWL('${s}')">✕</button>
   </div>`).join('');
   for(const s of wl){
     const d=await fetchStock(s);
     const row=document.getElementById('wi-'+s);if(!row)continue;
-    if(!d||!d.closes.length){row.querySelector('span:nth-child(2)').textContent='Could not load';continue;}
+    if(!d||!d.closes.length){row.querySelector('span:nth-child(2)').innerHTML='Could not load';continue;}
     const price=d.closes[d.closes.length-1];
     const prev=d.meta?.chartPreviousClose||d.closes[d.closes.length-2]||price;
     const chg=price-prev,chgP=(chg/prev)*100;
@@ -473,45 +614,7 @@ async function loadSym(s){
   full=data;renderView(data,132);
 }
  
-const NIFTY=['RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','ITC','WIPRO','SBIN','LT','AXISBANK','BAJFINANCE','KOTAKBANK','MARUTI','TITAN','SUNPHARMA'];
- 
-async function runScreener(){
-  const af=[...document.querySelectorAll('.fc.active')].map(b=>b.dataset.f);
-  if(!af.length)return alert('Select at least one filter.');
-  const el=document.getElementById('sc-out');
-  el.innerHTML='<div class="cd"><div style="padding:1.5rem;text-align:center;"><div class="sp"></div> Scanning stocks...</div></div>';
-  const res=[];
-  for(const s of NIFTY){
-    const d=await fetchStock(s);
-    if(!d||!d.closes||d.closes.length<20)continue;
-    const cls=d.closes,hi=d.highs,lo=d.lows;
-    const price=cls[cls.length-1];
-    const w52h=Math.max(...cls.slice(-252)),w52l=Math.min(...cls.slice(-252));
-    const rv=RSI(cls);const rsiV=rv.filter(v=>v!=null).slice(-1)[0]||50;
-    const ma200v=SMA(cls,Math.min(200,cls.length)).filter(v=>v!=null).slice(-1)[0]||0;
-    const prev=cls[cls.length-2]||price;const chgP=((price-prev)/prev)*100;
-    let pass=true;
-    if(af.includes('52wh')&&!(price>=w52h*.97))pass=false;
-    if(af.includes('52wl')&&!(price<=w52l*1.03))pass=false;
-    if(af.includes('rsi_low')&&!(rsiV<40))pass=false;
-    if(af.includes('rsi_high')&&!(rsiV>60))pass=false;
-    if(af.includes('uptrend')&&!(price>ma200v&&chgP>0))pass=false;
-    if(af.includes('downtrend')&&!(price<ma200v&&chgP<0))pass=false;
-    if(pass)res.push({s,price,chgP,rsiV,w52h});
-    await new Promise(r=>setTimeout(r,300));
-  }
-  if(!res.length){el.innerHTML='<div class="cd"><div class="em">No stocks matched.</div></div>';return;}
-  el.innerHTML='<div class="cd cf"><table><thead><tr><th>Symbol</th><th>Price</th><th>Change</th><th>RSI</th><th>52W High</th><th>Action</th></tr></thead><tbody>'+
-    res.map(r=>`<tr>
-      <td><strong style="color:var(--accent);font-family:'DM Mono',monospace;">${r.s}</strong></td>
-      <td>₹${r.price.toFixed(2)}</td>
-      <td class="${r.chgP>=0?'up':'dn'}">${r.chgP>=0?'+':''}${r.chgP.toFixed(2)}%</td>
-      <td style="color:${r.rsiV<40?'var(--green)':r.rsiV>60?'var(--red)':'var(--text)'}">${r.rsiV.toFixed(0)}</td>
-      <td>₹${r.w52h.toFixed(0)}</td>
-      <td><button class="btn bs bp" onclick="loadSym('${r.s}')">Analyse →</button></td>
-    </tr>`).join('')+'</tbody></table></div>';
-}
- 
+// ── NOTES ──
 function saveNote(){
   if(!sym)return;
   notes[sym]=document.getElementById('s-note').value;save();
