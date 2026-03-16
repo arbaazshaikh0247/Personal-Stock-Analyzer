@@ -67,7 +67,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
 .hold-medium{background:#2a1a2a;border:1px solid var(--purple);color:var(--purple);}
 .watch-box{background:linear-gradient(135deg,#2a1a0a,#1a1d27);border:1px solid var(--amber);border-radius:var(--r);padding:1.2rem;margin-bottom:1rem;}
 .dcf-box{background:linear-gradient(135deg,#1a0a2a,#1a1d27);border:1px solid var(--purple);border-radius:var(--r);padding:1.2rem;margin-bottom:1rem;}
-.dcf-input-box{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:1.2rem;margin-bottom:1rem;}
 .dcf-meter{height:8px;border-radius:999px;background:var(--s2);overflow:hidden;margin:8px 0;}
 .dcf-fill{height:100%;border-radius:999px;transition:width .5s;}
 .sp{display:inline-block;width:14px;height:14px;border:2px solid var(--b2);border-top-color:var(--accent);border-radius:50%;animation:spi .6s linear infinite;vertical-align:middle;}
@@ -82,7 +81,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
 .na:focus{outline:none;border-color:var(--accent);}
 .mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;padding:1rem;}
 .mo.open{display:flex;}
-.md{background:var(--surface);border-radius:var(--r);padding:1.5rem;width:100%;max-width:500px;border:1px solid var(--b2);}
+.md{background:var(--surface);border-radius:var(--r);padding:1.5rem;width:100%;max-width:560px;border:1px solid var(--b2);max-height:90vh;overflow-y:auto;}
 .mdt{font-size:15px;font-weight:600;margin-bottom:1rem;}.mda{display:flex;gap:8px;margin-top:1rem;}
 .fg{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;}
 .fg label{font-size:12px;font-weight:500;color:var(--t2);}
@@ -104,6 +103,23 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
 .eps-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .eps-row input{width:120px;padding:7px 10px;font-size:13px;border:1px solid var(--border);border-radius:var(--rs);background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;}
 .eps-row input:focus{outline:none;border-color:var(--purple);}
+ 
+/* EXPLAIN MODAL */
+.explain-section{margin-bottom:1.2rem;border-bottom:1px solid var(--border);padding-bottom:1.2rem;}
+.explain-section:last-child{border-bottom:none;margin-bottom:0;}
+.explain-section-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:.8rem;display:flex;align-items:center;gap:8px;}
+.explain-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:.6rem;font-size:13px;line-height:1.6;}
+.explain-indicator{min-width:80px;font-family:'DM Mono',monospace;font-size:12px;color:var(--t3);}
+.explain-value{min-width:70px;font-family:'DM Mono',monospace;font-weight:600;}
+.explain-meaning{color:var(--t2);flex:1;}
+.score-bar-wrap{background:var(--s2);border-radius:999px;height:8px;flex:1;overflow:hidden;min-width:80px;}
+.score-bar-fill{height:100%;border-radius:999px;transition:width .4s;}
+.score-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;}
+.sc-plus{background:#0f2a1a;color:var(--green);border:1px solid var(--green);}
+.sc-minus{background:#2a0f0f;color:var(--red);border:1px solid var(--red);}
+.sc-zero{background:var(--s2);color:var(--t3);border:1px solid var(--border);}
+.learn-box{background:var(--s2);border-left:3px solid var(--accent);border-radius:0 var(--rs) var(--rs) 0;padding:.8rem 1rem;margin-top:.8rem;font-size:12px;color:var(--t2);line-height:1.7;}
+.learn-box strong{color:var(--accent);}
 </style>
 </head>
 <body>
@@ -241,11 +257,23 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
  
 </main>
  
+<!-- WATCHLIST MODAL -->
 <div class="mo" id="wl-mo">
   <div class="md">
     <div class="mdt">Add to Watchlist</div>
     <div class="fg"><label>NSE Symbol</label><input id="wl-inp" type="text" placeholder="e.g. RELIANCE" style="text-transform:uppercase;"></div>
-    <div class="mda"><button class="btn bp" onclick="confirmWL()">Add</button><button class="btn" onclick="closeMo()">Cancel</button></div>
+    <div class="mda"><button class="btn bp" onclick="confirmWL()">Add</button><button class="btn" onclick="closeMo('wl-mo')">Cancel</button></div>
+  </div>
+</div>
+ 
+<!-- EXPLAIN ANALYSIS MODAL -->
+<div class="mo" id="explain-mo">
+  <div class="md" style="max-width:640px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <div class="mdt" style="margin:0;" id="explain-title">How I Analysed This</div>
+      <button class="btn bs bd" onclick="closeMo('explain-mo')">✕ Close</button>
+    </div>
+    <div id="explain-content"></div>
   </div>
 </div>
  
@@ -255,6 +283,7 @@ let notes      = JSON.parse(localStorage.getItem('hh_nt7')   || '{}');
 let customList = JSON.parse(localStorage.getItem('hh_cl7')   || '[]');
 let epsStore   = JSON.parse(localStorage.getItem('hh_eps')   || '{}');
 let sym='',full=null,CHS={},universe='n50',scanStop=false;
+let lastAI=null; // store last AI result for explain button
  
 function save(){
   localStorage.setItem('hh_wl7',JSON.stringify(wl));
@@ -275,29 +304,24 @@ function parseYahoo(data){
   return{dates:idx.map(i=>new Date(ts[i]*1000).toISOString().split('T')[0]),closes:idx.map(i=>closes[i]),highs:idx.map(i=>highs[i]||closes[i]),lows:idx.map(i=>lows[i]||closes[i]),volumes:idx.map(i=>volumes[i]||0),meta};
 }
  
-// ── DCF CALCULATION ──
-function calcDCF(eps, currentPrice, pe){
-  if(!eps || eps<=0 || !currentPrice) return null;
-  pe = pe || 20;
-  const growthRate    = pe > 40 ? 0.20 : pe > 25 ? 0.15 : pe > 15 ? 0.12 : 0.10;
-  const terminalGrowth = 0.04;
-  const discountRate   = 0.12;
-  const years = 10;
-  let dcfValue=0, currentEPS=eps;
-  for(let i=1;i<=years;i++){ currentEPS*=(1+growthRate); dcfValue+=currentEPS/Math.pow(1+discountRate,i); }
-  const terminalEPS=currentEPS*(1+terminalGrowth);
-  const terminalValue=(terminalEPS/(discountRate-terminalGrowth))/Math.pow(1+discountRate,years);
-  dcfValue+=terminalValue;
-  const fairPrice=dcfValue*Math.min(pe*0.7,20);
-  const margin=((fairPrice-currentPrice)/currentPrice)*100;
-  let verdict,color;
-  if(margin>20){verdict='Undervalued';color='var(--green)';}
-  else if(margin>-10){verdict='Fairly valued';color='var(--amber)';}
-  else{verdict='Overvalued';color='var(--red)';}
-  return{fairPrice,currentPrice,margin,verdict,color,growthRate,discountRate};
+function calcDCF(eps,currentPrice,pe){
+  if(!eps||eps<=0||!currentPrice)return null;
+  pe=pe||20;
+  const gr=pe>40?.20:pe>25?.15:pe>15?.12:.10;
+  const tg=0.04,dr=0.12,yr=10;
+  let dcfV=0,cEPS=eps;
+  for(let i=1;i<=yr;i++){cEPS*=(1+gr);dcfV+=cEPS/Math.pow(1+dr,i);}
+  const tv=(cEPS*(1+tg)/(dr-tg))/Math.pow(1+dr,yr);
+  dcfV+=tv;
+  const fp=dcfV*Math.min(pe*0.7,20);
+  const m=((fp-currentPrice)/currentPrice)*100;
+  let v,c;
+  if(m>20){v='Undervalued';c='var(--green)';}
+  else if(m>-10){v='Fairly valued';c='var(--amber)';}
+  else{v='Overvalued';c='var(--red)';}
+  return{fairPrice:fp,currentPrice,margin:m,verdict:v,color:c,growthRate:gr,discountRate:dr};
 }
  
-// ── TECHNICALS ──
 const SMA=(d,p)=>d.map((v,i)=>i<p-1?null:d.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);
 const EMA=(d,p)=>{const k=2/(p+1);return d.reduce((a,v,i)=>{a.push(i===0?v:v*k+a[i-1]*(1-k));return a;},[]);};
 function RSI(d,p=14){const r=Array(p).fill(null);for(let i=p;i<d.length;i++){let g=0,l=0;for(let j=i-p;j<i;j++){const x=d[j+1]-d[j];x>0?g+=x:l-=x;}const ag=g/p,al=l/p;r.push(al===0?100:100-(100/(1+ag/al)));}return r;}
@@ -324,12 +348,37 @@ function getAIScore(d){
   const riskP=(price-sl)/price*100;
   const rewP=(exitTgt-price)/price*100;
   const rr=rewP/riskP;
+ 
+  // Scoring — track each point separately for explain
+  const scores=[];
   let sc=0;
-  if(price>ma200V)sc+=2;if(price>ma50V)sc+=1;if(price>ma20V)sc+=1;
-  if(rsiV<70&&rsiV>30)sc+=1;if(rsiV<50)sc-=1;if(rsiV<35)sc+=1;
-  if(macdV>sigV)sc+=2;else sc-=1;
-  if(volSp>1.5)sc+=1;if(rr>=2)sc+=1;
+  const addScore=(label,pts,reason)=>{ sc+=pts; scores.push({label,pts,reason}); };
+ 
+  if(price>ma200V) addScore('Price vs 200MA',2,`Price ₹${price.toFixed(0)} is above 200MA ₹${ma200V.toFixed(0)} — long term uptrend confirmed`);
+  else addScore('Price vs 200MA',0,`Price ₹${price.toFixed(0)} is below 200MA ₹${ma200V.toFixed(0)} — long term downtrend, bearish`);
+ 
+  if(price>ma50V) addScore('Price vs 50MA',1,`Price is above 50MA ₹${ma50V.toFixed(0)} — medium term trend is up`);
+  else addScore('Price vs 50MA',0,`Price is below 50MA ₹${ma50V.toFixed(0)} — medium term trend is down`);
+ 
+  if(price>ma20V) addScore('Price vs 20MA',1,`Price is above 20MA ₹${ma20V.toFixed(0)} — short term momentum is positive`);
+  else addScore('Price vs 20MA',0,`Price is below 20MA ₹${ma20V.toFixed(0)} — short term momentum is weak`);
+ 
+  if(rsiV<70&&rsiV>30) addScore('RSI zone',1,`RSI ${rsiV.toFixed(1)} is in the healthy zone (30–70) — not overbought or oversold`);
+  if(rsiV<50){ addScore('RSI direction',-1,`RSI ${rsiV.toFixed(1)} is below 50 — momentum is leaning bearish`); }
+  if(rsiV<35){ addScore('RSI oversold',1,`RSI ${rsiV.toFixed(1)} is below 35 — oversold territory, historically a good buying zone`); }
+  if(rsiV>=70) addScore('RSI overbought',0,`RSI ${rsiV.toFixed(1)} is above 70 — overbought, risk of pullback`);
+ 
+  if(macdV>sigV) addScore('MACD crossover',2,`MACD line (${macdV.toFixed(2)}) is above Signal line (${sigV.toFixed(2)}) — bullish crossover, buying momentum building`);
+  else { addScore('MACD crossover',-1,`MACD line (${macdV.toFixed(2)}) is below Signal line (${sigV.toFixed(2)}) — bearish crossover, selling pressure`); }
+ 
+  if(volSp>1.5) addScore('Volume spike',1,`Volume is ${volSp.toFixed(1)}× above 10-day average — strong conviction behind the move`);
+  else addScore('Volume',0,`Volume is near average (${volSp.toFixed(1)}× normal) — no unusual activity`);
+ 
+  if(rr>=2) addScore('Risk:Reward ratio',1,`R:R ratio is ${rr.toFixed(1)}:1 — reward is more than twice the risk, favorable trade setup`);
+  else addScore('Risk:Reward ratio',0,`R:R ratio is ${rr.toFixed(1)}:1 — reward does not significantly outweigh the risk`);
+ 
   const verdict=sc>=6?'BUY':sc>=3?'HOLD':'AVOID';
+ 
   let holdDuration='',holdClass='',holdIcon='';
   if(verdict==='BUY'){
     const ts=(price>ma200V?2:0)+(price>ma50V?1:0)+(price>ma20V?1:0);
@@ -338,23 +387,211 @@ function getAIScore(d){
     else if(ts>=2&&ms>=1){holdDuration='Short term: 1–2 months';holdClass='hold-short';holdIcon='📅';}
     else{holdDuration='Medium term: 2–4 months';holdClass='hold-medium';holdIcon='📆';}
   }
+ 
   let watchEntry=null;
   if(verdict!=='BUY'){
     const isDown=price<ma200V&&price<ma50V;
     const isSide=Math.abs((price-ma50V)/ma50V)<0.05;
     if(isDown){
-      const supportLevel=Math.min(...cls.slice(-60))*1.01;
-      watchEntry={type:'Downtrend — wait for reversal',watchPrice:supportLevel,confirmAbove:ma20V,reason:`Stock is in a downtrend. Watch for a bounce from support ₹${supportLevel.toFixed(0)}. Enter only when price closes above 20MA (₹${ma20V.toFixed(0)}) with RSI crossing 40 — that confirms reversal.`,targetAfterEntry:supportLevel*(1+atrV/supportLevel*2)};
+      const sL=Math.min(...cls.slice(-60))*1.01;
+      watchEntry={type:'Downtrend — wait for reversal',watchPrice:sL,confirmAbove:ma20V,reason:`Stock is in a downtrend. Watch for a bounce from support ₹${sL.toFixed(0)}. Enter only when price closes above 20MA (₹${ma20V.toFixed(0)}) with RSI crossing 40 — that confirms reversal.`,targetAfterEntry:sL*(1+atrV/sL*2)};
     }else if(isSide){
       watchEntry={type:'Sideways — wait for breakout',watchPrice:resist,confirmAbove:resist*1.01,reason:`Stock is consolidating. Watch for a breakout above ₹${resist.toFixed(0)} on high volume. Enter on breakout confirmation.`,targetAfterEntry:resist*1.08};
     }else{
       watchEntry={type:'Weak trend — wait for momentum',watchPrice:ma50V,confirmAbove:ma50V*1.02,reason:`Stock needs momentum confirmation. Watch for price to hold above 50MA (₹${ma50V.toFixed(0)}) with MACD bullish cross before entering.`,targetAfterEntry:resist};
     }
   }
+ 
   const entryLow=Math.max(support,price*(rsiV>65?.95:.97));
   const entryHigh=price*(rsiV>65?.99:1.01);
-  return{verdict,score:sc,price,rsiV,macdBull:macdV>sigV,trend:price>ma200V&&price>ma50V?'Strong Uptrend':price>ma200V?'Moderate Uptrend':price<ma200V&&price<ma50V?'Downtrend':'Sideways',entryLow,entryHigh,exitTgt,sl,riskP:riskP.toFixed(1),rewP:rewP.toFixed(1),rr:rr.toFixed(1),holdDuration,holdClass,holdIcon,watchEntry,atrV,ma20V,ma50V,ma200V,macdV,sigV,volSp};
+ 
+  return{verdict,score:sc,scores,price,rsiV,macdBull:macdV>sigV,
+    trend:price>ma200V&&price>ma50V?'Strong Uptrend':price>ma200V?'Moderate Uptrend':price<ma200V&&price<ma50V?'Downtrend':'Sideways',
+    entryLow,entryHigh,exitTgt,sl,riskP:riskP.toFixed(1),rewP:rewP.toFixed(1),rr:rr.toFixed(1),
+    holdDuration,holdClass,holdIcon,watchEntry,atrV,ma20V,ma50V,ma200V,macdV,sigV,volSp,
+    support,resist,avgVol};
 }
+ 
+// ── EXPLAIN ANALYSIS ──
+function openExplain(){
+  if(!lastAI) return;
+  const ai=lastAI;
+  document.getElementById('explain-title').textContent=`How I Analysed ${sym} — ${ai.verdict}`;
+ 
+  const scoreColor=pts=>pts>0?'var(--green)':pts<0?'var(--red)':'var(--t3)';
+  const scoreChip=pts=>pts>0?`<span class="score-chip sc-plus">+${pts}</span>`:pts<0?`<span class="score-chip sc-minus">${pts}</span>`:`<span class="score-chip sc-zero">0</span>`;
+ 
+  const maxScore=10;
+  const scorePct=Math.min(100,Math.max(0,(ai.score/maxScore)*100));
+  const scoreBarColor=ai.verdict==='BUY'?'var(--green)':ai.verdict==='HOLD'?'var(--amber)':'var(--red)';
+ 
+  document.getElementById('explain-content').innerHTML=`
+ 
+    <!-- FINAL VERDICT -->
+    <div class="explain-section">
+      <div class="explain-section-title">🏆 Final Verdict</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:.8rem;">
+        <div style="font-size:24px;font-weight:600;color:${scoreBarColor};">${ai.verdict}</div>
+        <div style="flex:1;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-bottom:4px;">
+            <span>Score: ${ai.score} / ${maxScore}</span>
+            <span>${ai.verdict==='BUY'?'6+ = BUY':ai.verdict==='HOLD'?'3–5 = HOLD':'0–2 = AVOID'}</span>
+          </div>
+          <div class="score-bar-wrap" style="height:10px;">
+            <div class="score-bar-fill" style="width:${scorePct}%;background:${scoreBarColor};"></div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.7;">
+        I scored <strong>${sym}</strong> at <strong style="color:${scoreBarColor};">${ai.score} out of 10</strong>.
+        ${ai.verdict==='BUY'?'A score of 6 or above is needed for a BUY. Multiple indicators aligned positively.':ai.verdict==='HOLD'?'A score of 3–5 means HOLD. Some positive signals but not enough alignment for a confident entry.':'A score below 3 means AVOID. Most indicators are negative or neutral.'}
+      </div>
+      ${ai.holdDuration?`<div style="margin-top:.8rem;"><div class="hold-badge ${ai.holdClass}">${ai.holdIcon} ${ai.holdDuration}</div><div style="font-size:12px;color:var(--t3);margin-top:6px;">Hold duration is based on trend strength and momentum alignment.</div></div>`:''}
+    </div>
+ 
+    <!-- SCORING BREAKDOWN -->
+    <div class="explain-section">
+      <div class="explain-section-title">📊 Scoring Breakdown — Every Indicator</div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:.8rem;">Each indicator adds or subtracts from the score. Here's exactly what I found:</div>
+      ${ai.scores.map(s=>`
+        <div class="explain-row">
+          <div style="min-width:160px;font-size:12px;font-weight:500;color:var(--text);">${s.label}</div>
+          ${scoreChip(s.pts)}
+          <div class="explain-meaning">${s.reason}</div>
+        </div>`).join('')}
+      <div class="learn-box">
+        <strong>💡 How scoring works:</strong> I check 8 indicators. Each positive signal adds points, each negative signal subtracts. 
+        Score 6+ = BUY, Score 3–5 = HOLD, Score 0–2 = AVOID. The more indicators that agree, the stronger the signal.
+      </div>
+    </div>
+ 
+    <!-- TREND ANALYSIS -->
+    <div class="explain-section">
+      <div class="explain-section-title">📈 Trend Analysis — Moving Averages</div>
+      <div class="explain-row"><div class="explain-indicator">20 MA</div><div class="explain-value" style="color:${ai.price>ai.ma20V?'var(--green)':'var(--red)'};">₹${ai.ma20V.toFixed(0)}</div><div class="explain-meaning">Short term trend. Price is ${ai.price>ai.ma20V?'<strong style="color:var(--green)">above</strong> — bullish short term':'<strong style="color:var(--red)">below</strong> — bearish short term'}.</div></div>
+      <div class="explain-row"><div class="explain-indicator">50 MA</div><div class="explain-value" style="color:${ai.price>ai.ma50V?'var(--green)':'var(--red)'};">₹${ai.ma50V.toFixed(0)}</div><div class="explain-meaning">Medium term trend. Price is ${ai.price>ai.ma50V?'<strong style="color:var(--green)">above</strong> — medium term uptrend':'<strong style="color:var(--red)">below</strong> — medium term downtrend'}.</div></div>
+      <div class="explain-row"><div class="explain-indicator">200 MA</div><div class="explain-value" style="color:${ai.price>ai.ma200V?'var(--green)':'var(--red)'};">₹${ai.ma200V.toFixed(0)}</div><div class="explain-meaning">Long term trend. Price is ${ai.price>ai.ma200V?'<strong style="color:var(--green)">above</strong> — long term uptrend (most important)':'<strong style="color:var(--red)">below</strong> — long term downtrend (most important)'}.</div></div>
+      <div class="learn-box">
+        <strong>💡 What is a Moving Average?</strong> It's the average closing price over the last N days. 
+        When price is above its MA, the trend is up. When below, the trend is down. 
+        The 200MA is the most important — professional traders watch it closely. 
+        <strong>Golden rule:</strong> Only buy stocks trading above their 200MA.
+      </div>
+    </div>
+ 
+    <!-- RSI -->
+    <div class="explain-section">
+      <div class="explain-section-title">⚡ Momentum — RSI</div>
+      <div class="explain-row">
+        <div class="explain-indicator">RSI (14)</div>
+        <div class="explain-value" style="color:${ai.rsiV<30?'var(--green)':ai.rsiV>70?'var(--red)':'var(--accent)'};">${ai.rsiV.toFixed(1)}</div>
+        <div class="explain-meaning">
+          ${ai.rsiV<30?'<strong style="color:var(--green)">Oversold</strong> — stock has been sold too much, a bounce is likely. Good buying zone.':ai.rsiV>70?'<strong style="color:var(--red)">Overbought</strong> — stock has been bought too much, a pullback is likely. Risky to buy now.':ai.rsiV>50?'<strong style="color:var(--green)">Bullish neutral</strong> — momentum is positive but not extreme.':'<strong style="color:var(--amber)">Bearish neutral</strong> — momentum is leaning negative.'}
+        </div>
+      </div>
+      <div class="learn-box">
+        <strong>💡 What is RSI?</strong> RSI (Relative Strength Index) measures how fast and how much a stock has moved. 
+        It ranges from 0 to 100. Below 30 = oversold (too much selling, bounce likely). Above 70 = overbought (too much buying, correction likely). 
+        Between 40–60 is neutral. <strong>Best buy signals</strong> often appear when RSI is between 35–50 and turning upward.
+      </div>
+    </div>
+ 
+    <!-- MACD -->
+    <div class="explain-section">
+      <div class="explain-section-title">📉 Momentum — MACD</div>
+      <div class="explain-row">
+        <div class="explain-indicator">MACD line</div>
+        <div class="explain-value" style="color:${ai.macdBull?'var(--green)':'var(--red)'};">${ai.macdV.toFixed(2)}</div>
+        <div class="explain-meaning">The MACD line is ${ai.macdBull?'<strong style="color:var(--green)">above the signal line</strong> — bullish crossover. Buying momentum is building.':'<strong style="color:var(--red)">below the signal line</strong> — bearish crossover. Selling pressure is present.'}
+        </div>
+      </div>
+      <div class="explain-row">
+        <div class="explain-indicator">Signal line</div>
+        <div class="explain-value">${ai.sigV.toFixed(2)}</div>
+        <div class="explain-meaning">When MACD crosses above signal line → BUY signal. When it crosses below → SELL signal.</div>
+      </div>
+      <div class="learn-box">
+        <strong>💡 What is MACD?</strong> MACD compares two moving averages (12-day and 26-day EMA) to show momentum direction. 
+        The most important signal is when the MACD line crosses the Signal line. 
+        Cross above = bullish (buying momentum). Cross below = bearish (selling momentum). 
+        The histogram bars show the strength of the crossover.
+      </div>
+    </div>
+ 
+    <!-- VOLUME -->
+    <div class="explain-section">
+      <div class="explain-section-title">📦 Volume Analysis</div>
+      <div class="explain-row">
+        <div class="explain-indicator">Volume</div>
+        <div class="explain-value" style="color:${ai.volSp>1.5?'var(--green)':ai.volSp<0.7?'var(--red)':'var(--t2)'};">${ai.volSp.toFixed(1)}×</div>
+        <div class="explain-meaning">
+          ${ai.volSp>1.5?`<strong style="color:var(--green)">High volume</strong> — today's volume is ${ai.volSp.toFixed(1)}× the 10-day average. Strong conviction behind the move.`:ai.volSp<0.7?`<strong style="color:var(--amber)">Low volume</strong> — volume is below average. Move may not be sustainable.`:`Volume is near average (${ai.volSp.toFixed(1)}× normal) — no unusual activity.`}
+        </div>
+      </div>
+      <div class="learn-box">
+        <strong>💡 Why does volume matter?</strong> Volume tells you how many people are buying or selling. 
+        A price move on HIGH volume = strong, reliable signal (many traders agree). 
+        A price move on LOW volume = weak signal (few traders participating, may reverse). 
+        <strong>Golden rule:</strong> Always check volume before trusting a breakout or breakdown.
+      </div>
+    </div>
+ 
+    <!-- ENTRY / EXIT / SL -->
+    <div class="explain-section">
+      <div class="explain-section-title">🎯 How I Calculated Entry, Target & Stop Loss</div>
+      <div class="explain-row">
+        <div class="explain-indicator">Support</div>
+        <div class="explain-value">₹${ai.support.toFixed(0)}</div>
+        <div class="explain-meaning">Lowest price in last 20 days +1%. This is where buyers historically step in.</div>
+      </div>
+      <div class="explain-row">
+        <div class="explain-indicator">Resistance</div>
+        <div class="explain-value">₹${ai.resist.toFixed(0)}</div>
+        <div class="explain-meaning">Highest price in last 20 days -1%. This is where sellers historically appear.</div>
+      </div>
+      <div class="explain-row">
+        <div class="explain-indicator">Entry zone</div>
+        <div class="explain-value" style="color:var(--green);">₹${ai.entryLow.toFixed(0)}–₹${ai.entryHigh.toFixed(0)}</div>
+        <div class="explain-meaning">Between support and current price. ${ai.rsiV>65?'Adjusted down because RSI is high — wait for a small pullback.':'Near current price since RSI is not overbought.'}</div>
+      </div>
+      <div class="explain-row">
+        <div class="explain-indicator">Target</div>
+        <div class="explain-value" style="color:var(--accent);">₹${ai.exitTgt.toFixed(0)}</div>
+        <div class="explain-meaning">The lower of: resistance ×1.05 or current price ×1.12. Conservative target based on nearest resistance.</div>
+      </div>
+      <div class="explain-row">
+        <div class="explain-indicator">ATR</div>
+        <div class="explain-value">₹${ai.atrV.toFixed(0)}</div>
+        <div class="explain-meaning">Average True Range — the stock typically moves ₹${ai.atrV.toFixed(0)} per day. Used to set stop loss.</div>
+      </div>
+      <div class="explain-row">
+        <div class="explain-indicator">Stop Loss</div>
+        <div class="explain-value" style="color:var(--red);">₹${ai.sl.toFixed(0)}</div>
+        <div class="explain-meaning">Current price minus 1.5× ATR = ₹${ai.price.toFixed(0)} − ₹${(ai.atrV*1.5).toFixed(0)} = ₹${ai.sl.toFixed(0)}. Gives the stock room to breathe without too much risk.</div>
+      </div>
+      <div class="explain-row">
+        <div class="explain-indicator">R:R Ratio</div>
+        <div class="explain-value" style="color:${parseFloat(ai.rr)>=2?'var(--green)':'var(--amber)'};">${ai.rr}:1</div>
+        <div class="explain-meaning">Reward (${ai.rewP}% upside) ÷ Risk (${ai.riskP}% downside) = ${ai.rr}. ${parseFloat(ai.rr)>=2?'Above 2:1 is good — you stand to gain more than you risk.':'Below 2:1 — risk is relatively high compared to potential reward.'}</div>
+      </div>
+      <div class="learn-box">
+        <strong>💡 The most important concept in trading:</strong> Risk:Reward ratio. 
+        Never enter a trade where the potential loss is bigger than the potential gain. 
+        Aim for minimum 2:1 — meaning if you risk ₹100, your target should be at least ₹200. 
+        Even if you are right only 40% of the time, you will still be profitable with 2:1 R:R.
+      </div>
+    </div>
+ 
+    <div style="font-size:11px;color:var(--t3);text-align:center;padding-top:.5rem;">Analysis based on technical indicators only. Not financial advice.</div>
+  `;
+ 
+  openModal('explain-mo');
+}
+ 
+// ── MODALS ──
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeMo(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.mo').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('open');}));
  
 // ── NAV ──
 function go(id){
@@ -368,7 +605,7 @@ function go(id){
  
 async function doSearch(){
   const raw=document.getElementById('inp').value.trim().toUpperCase().replace(/\.(NS|BO)$/,'');
-  if(!raw)return;sym=raw;
+  if(!raw)return;sym=raw;lastAI=null;
   showMsg(`<div style="padding:2rem;text-align:center;"><div class="sp"></div><br><br><span style="color:var(--t3);">Loading ${raw}...</span></div>`);
   const data=await fetchStock(raw);
   if(!data||!data.closes.length){showMsg(`<div class="em"><strong>Could not load "${raw}"</strong><br><br>Check the NSE symbol is correct.<br>Examples: RELIANCE, TCS, INFY, HDFCBANK, ITC, WIPRO</div>`);return;}
@@ -471,6 +708,7 @@ function runAI(){
   btn.disabled=true;btn.innerHTML='<span class="sp"></span> Analysing...';
   const ai=getAIScore(full);
   if(!ai){btn.disabled=false;btn.innerHTML='🤖 AI Analysis';return;}
+  lastAI=ai;
   btn.disabled=false;btn.innerHTML='🤖 AI Analysis';
   box.style.display='block';
  
@@ -478,7 +716,6 @@ function runAI(){
   const vco=ai.verdict==='BUY'?'var(--green)':ai.verdict==='HOLD'?'var(--amber)':'var(--red)';
   const vr={BUY:`Strong alignment — trend, momentum and volume support entry. R:R of ${ai.rr}:1 is favorable.`,HOLD:`Mixed signals. Not enough confirmation for confident entry. See watch zone below.`,AVOID:`Indicators mostly negative. See the right entry level below for when to consider.`};
  
-  // Watch entry box
   const watchHTML=ai.watchEntry?`
     <div class="watch-box">
       <div style="font-size:12px;font-weight:600;color:var(--amber);text-transform:uppercase;letter-spacing:.5px;margin-bottom:1rem;">👁 Right Entry Level — ${ai.watchEntry.type}</div>
@@ -490,28 +727,27 @@ function runAI(){
       <div style="font-size:13px;color:var(--t2);line-height:1.7;">${ai.watchEntry.reason}</div>
     </div>`:'';
  
-  // DCF input box — show saved EPS if exists
-  const savedEPS = epsStore[sym] || '';
-  const dcfResultHTML = savedEPS ? renderDCFResult(savedEPS, ai.price) : '';
- 
+  const savedEPS=epsStore[sym]||'';
+  const dcfResultHTML=savedEPS?renderDCFResult(savedEPS,ai.price):'';
   const dcfHTML=`
     <div class="dcf-box">
-      <div style="font-size:12px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.8rem;">🔮 DCF Intrinsic Value Analysis</div>
+      <div style="font-size:12px;font-weight:600;color:var(--purple);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.8rem;">🔮 DCF Intrinsic Value</div>
       <div style="font-size:13px;color:var(--t2);line-height:1.7;margin-bottom:1rem;">
-        Enter the <strong>EPS (Earnings Per Share)</strong> to calculate DCF fair value.<br>
-        Find it on <a href="https://www.screener.in/company/${sym}/" target="_blank" style="color:var(--accent);">Screener.in → ${sym}</a> under "Earnings Per Share" or "EPS".
+        Enter EPS to calculate fair value. Find it on <a href="https://www.screener.in/company/${sym}/" target="_blank" style="color:var(--accent);">Screener.in → ${sym}</a>
       </div>
       <div class="eps-row">
         <span style="font-size:13px;color:var(--t2);">EPS (₹):</span>
         <input type="number" id="eps-input" placeholder="e.g. 58.5" value="${savedEPS}" step="0.01">
-        <button class="btn bs bp" onclick="calculateDCF()">Calculate DCF</button>
-        ${savedEPS?`<span style="font-size:12px;color:var(--t3);">Using saved EPS</span>`:''}
+        <button class="btn bs bp" onclick="calculateDCF()">Calculate</button>
       </div>
       <div id="dcf-result" style="margin-top:1rem;">${dcfResultHTML}</div>
     </div>`;
  
   box.innerHTML=`<div class="aib">
-    <div class="ait">🤖 AI Analysis — ${sym}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;">
+      <div class="ait" style="margin:0;">🤖 AI Analysis — ${sym}</div>
+      <button class="btn bs" onclick="openExplain()" style="border-color:var(--accent);color:var(--accent);">📖 How I calculated this</button>
+    </div>
     <div class="${vc}">
       <div class="vt" style="color:${vco};">${ai.verdict}</div>
       <div class="vr">${vr[ai.verdict]}</div>
@@ -527,8 +763,8 @@ function runAI(){
     ${dcfHTML}
     <div class="ais"><div class="aist">📈 Trend</div><p>${sym} is in a <strong>${ai.trend}</strong>. Price ₹${ai.price.toFixed(0)} is ${ai.price>ai.ma200V?'<span style="color:var(--green)">above</span>':'<span style="color:var(--red)">below</span>'} 200MA (₹${ai.ma200V.toFixed(0)}), ${ai.price>ai.ma50V?'<span style="color:var(--green)">above</span>':'<span style="color:var(--red)">below</span>'} 50MA (₹${ai.ma50V.toFixed(0)}). ${ai.volSp>1.5?`<strong style="color:var(--green)">Volume ${ai.volSp.toFixed(1)}× above average</strong> — strong conviction.`:ai.volSp<0.7?'Volume below average — weak conviction.':'Volume near average.'}</p></div>
     <div class="ais"><div class="aist">⚡ Momentum</div><p>RSI <strong style="color:${ai.rsiV<30?'var(--green)':ai.rsiV>70?'var(--red)':'var(--text)'}">${ai.rsiV.toFixed(1)}</strong> — ${ai.rsiV<30?'<strong>Oversold</strong>, historically a good zone':ai.rsiV>70?'<strong>Overbought</strong>, risk of pullback':'neutral zone'}. MACD <strong style="color:${ai.macdBull?'var(--green)':'var(--red)'}">${ai.macdBull?'bullish':'bearish'}</strong> cross.</p></div>
-    <div class="ais"><div class="aist">🏗️ Key Levels</div><p>ATR ₹${ai.atrV.toFixed(0)}/day — typical daily range. Stop loss 1.5× ATR below current price.</p></div>
-    <div style="font-size:11px;color:var(--t3);margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border);">⚠️ Technical + DCF analysis only. Not financial advice. Always do your own research.</div>
+    <div class="ais"><div class="aist">🏗️ Key Levels</div><p>Support ₹${ai.support.toFixed(0)} · Resistance ₹${ai.resist.toFixed(0)} · ATR ₹${ai.atrV.toFixed(0)}/day · Stop loss 1.5× ATR below price.</p></div>
+    <div style="font-size:11px;color:var(--t3);margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border);">⚠️ Technical analysis only. Not financial advice. Always do your own research.</div>
   </div>`;
 }
  
@@ -546,8 +782,8 @@ function renderDCFResult(eps,price,pe){
   const dcf=calcDCF(eps,price,pe);
   if(!dcf)return'';
   return`
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:1rem;">
-      <div class="zb"><div class="zl">Fair Value (DCF)</div><div class="zv" style="color:var(--purple);">₹${dcf.fairPrice.toFixed(0)}</div><div class="zsub">10-yr discounted cashflow</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:.8rem;">
+      <div class="zb"><div class="zl">Fair Value</div><div class="zv" style="color:var(--purple);">₹${dcf.fairPrice.toFixed(0)}</div><div class="zsub">DCF intrinsic value</div></div>
       <div class="zb"><div class="zl">Current Price</div><div class="zv">₹${dcf.currentPrice.toFixed(0)}</div><div class="zsub">Market price today</div></div>
       <div class="zb"><div class="zl">Margin of Safety</div><div class="zv" style="color:${dcf.color};">${dcf.margin>0?'+':''}${dcf.margin.toFixed(1)}%</div><div class="zsub">${dcf.verdict}</div></div>
       <div class="zb"><div class="zl">Growth assumed</div><div class="zv" style="font-size:13px;">${(dcf.growthRate*100).toFixed(0)}% p.a.</div><div class="zsub">Discount: 12%</div></div>
@@ -556,7 +792,7 @@ function renderDCFResult(eps,price,pe){
     <div style="font-size:12px;color:var(--t2);line-height:1.6;margin-top:.5rem;">
       ${dcf.margin>20?`<strong style="color:var(--green);">Undervalued by ${dcf.margin.toFixed(1)}%</strong> — trading below intrinsic value. Good margin of safety.`:dcf.margin>-10?`<strong style="color:var(--amber);">Fairly valued</strong> — trading near intrinsic value.`:`<strong style="color:var(--red);">Overvalued by ${Math.abs(dcf.margin).toFixed(1)}%</strong> — trading above DCF fair value. Higher risk for new entry.`}
     </div>
-    <div style="font-size:11px;color:var(--t3);margin-top:.5rem;">EPS used: ₹${eps} | Growth: ${(dcf.growthRate*100).toFixed(0)}% | Discount rate: 12% | Terminal growth: 4%</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:.4rem;">EPS: ₹${eps} | Growth: ${(dcf.growthRate*100).toFixed(0)}% | Discount: 12% | Terminal: 4%</div>
   `;
 }
  
@@ -569,7 +805,7 @@ function renderCustomPills(){const el=document.getElementById('custom-pills');if
 function stopScan(){scanStop=true;document.getElementById('stop-btn').style.display='none';document.getElementById('run-btn').disabled=false;}
  
 const NIFTY50=['RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','ITC','WIPRO','SBIN','LT','AXISBANK','BAJFINANCE','KOTAKBANK','MARUTI','TITAN','SUNPHARMA','NESTLEIND','ASIANPAINT','HCLTECH','TECHM','ULTRACEMCO','POWERGRID','NTPC','ONGC','TATAMOTORS','TATASTEEL','JSWSTEEL','COALINDIA','DIVISLAB','DRREDDY','CIPLA','EICHERMOT','HEROMOTOCO','HINDALCO','BAJAJ-AUTO','BRITANNIA','ADANIPORTS','GRASIM','M&M','BPCL','INDUSINDBK','APOLLOHOSP','TATACONSUM','UPL','BAJAJFINSV','SBILIFE','HDFCLIFE','LTIM','ADANIENT','SHREECEM','HINDUNILVR'];
-const NIFTY500=[...NIFTY50,'DMART','PIDILITIND','BERGEPAINT','MARICO','DABUR','COLPAL','GODREJCP','TATAPOWER','TORNTPHARM','LUPIN','AUROPHARMA','ALKEM','ZYDUSLIFE','BIOCON','LALPATHLAB','METROPOLIS','FORTIS','MAXHEALTH','SUDARSCHEM','AAVAS','CANFINHOME','HOMEFIRST','REPCO','LICHSGFIN','PNBHOUSING','BAJAJHFL','MUTHOOTFIN','MANAPPURAM','CHOLAFIN','SHRIRAMFIN','M&MFIN','SUNDARMFIN','RECLTD','PFC','IRFC','NHPC','SJVN','CESC','TATAELXSI','PERSISTENT','COFORGE','MPHASIS','LTTS','KPITTECH','MASTEK','ZENSAR','TANLA','INTELLECT','POLYCAB','HAVELLS','CROMPTON','VGUARD','KEI','CEAT','APOLLOTYRE','MRF','BALKRISIND','BHARTIARTL','TATACOMM','INDIACEM','RAMCOCEM','JKCEMENT','DALMIA','BIRLACORPN','PVRINOX','ZEEL','SUNTV','DELTACORP','ESCORTS','SONACOMS','ENDURANCE','MOTHERSON','MINDARIND','LUMAX','GABRIEL','BOSCH','ELGIEQUIP','GREAVESCOT','GREENPANEL','CENTURYPLY','NILKAMAL','PRINCEPIPE','ASTRALPOLY','SUPREMEIND','FINOLEX','WHIRLPOOL','VOLTAS','BLUESTARCO','SYMPHONY','AMBER','DIXON','KAYNES','RVNL','IRCTC','CONCOR','ADANIGREEN','ADANIPOWER','TATAPOWER','TORNTPOWER','GREENKO','INOXWIND','SUZLON'];
+const NIFTY500=[...NIFTY50,'DMART','PIDILITIND','BERGEPAINT','MARICO','DABUR','COLPAL','GODREJCP','TATAPOWER','TORNTPHARM','LUPIN','AUROPHARMA','ALKEM','ZYDUSLIFE','BIOCON','LALPATHLAB','METROPOLIS','FORTIS','MAXHEALTH','SUDARSCHEM','AAVAS','CANFINHOME','HOMEFIRST','REPCO','LICHSGFIN','PNBHOUSING','BAJAJHFL','MUTHOOTFIN','MANAPPURAM','CHOLAFIN','SHRIRAMFIN','M&MFIN','SUNDARMFIN','RECLTD','PFC','IRFC','NHPC','SJVN','CESC','TATAELXSI','PERSISTENT','COFORGE','MPHASIS','LTTS','KPITTECH','MASTEK','ZENSAR','TANLA','INTELLECT','POLYCAB','HAVELLS','CROMPTON','VGUARD','KEI','CEAT','APOLLOTYRE','MRF','BALKRISIND','BHARTIARTL','TATACOMM','INDIACEM','RAMCOCEM','JKCEMENT','DALMIA','BIRLACORPN','PVRINOX','ZEEL','SUNTV','DELTACORP','ESCORTS','SONACOMS','ENDURANCE','MOTHERSON','MINDARIND','LUMAX','GABRIEL','BOSCH','ELGIEQUIP','GREAVESCOT','GREENPANEL','CENTURYPLY','NILKAMAL','PRINCEPIPE','ASTRALPOLY','SUPREMEIND','FINOLEX','WHIRLPOOL','VOLTAS','BLUESTARCO','SYMPHONY','AMBER','DIXON','KAYNES','RVNL','IRCTC','CONCOR','ADANIGREEN','ADANIPOWER','TORNTPOWER','GREENKO','INOXWIND','SUZLON'];
  
 async function runScreener(){
   const af=[...document.querySelectorAll('.fc.active')].map(b=>b.dataset.f);
@@ -646,17 +882,15 @@ function renderScanResults(res,scanned,total,isClaudeMode,done){
         <button class="btn bs bp" onclick="loadSym('${r.s}')">Full Analysis →</button>
       </div>`).join('')+
       '<div style="font-size:11px;color:var(--t3);margin-top:.5rem;">⚠️ Technical analysis only. Not financial advice.</div>';
-  } else {
+  }else{
     el.innerHTML='<div class="cd cf"><table><thead><tr><th>Symbol</th><th>Price</th><th>Change</th><th>RSI</th><th>52W High</th><th>Action</th></tr></thead><tbody>'+
       res.map(r=>`<tr><td><strong style="color:var(--accent);font-family:'DM Mono',monospace;">${r.s}</strong></td><td>₹${r.price.toFixed(2)}</td><td class="${r.chgP>=0?'up':'dn'}">${r.chgP>=0?'+':''}${r.chgP.toFixed(2)}%</td><td style="color:${r.rsiV<40?'var(--green)':r.rsiV>60?'var(--red)':'var(--text)'}">${r.rsiV.toFixed(0)}</td><td>₹${r.w52h.toFixed(0)}</td><td><button class="btn bs bp" onclick="loadSym('${r.s}')">Analyse →</button></td></tr>`).join('')+'</tbody></table></div>';
   }
 }
  
 // ── WATCHLIST ──
-function addWL(){if(!sym){document.getElementById('wl-inp').value='';document.getElementById('wl-mo').classList.add('open');return;}if(wl.length>=20)return alert('Watchlist full.');if(wl.includes(sym))return alert(sym+' already in watchlist.');wl.push(sym);save();alert(sym+' added!');}
-function confirmWL(){const s=document.getElementById('wl-inp').value.trim().toUpperCase();if(!s)return;if(!wl.includes(s)){wl.push(s);save();}closeMo();loadWLPrices();}
-function closeMo(){document.getElementById('wl-mo').classList.remove('open');}
-document.getElementById('wl-mo').addEventListener('click',e=>{if(e.target===e.currentTarget)closeMo();});
+function addWL(){if(!sym){document.getElementById('wl-inp').value='';openModal('wl-mo');return;}if(wl.length>=20)return alert('Watchlist full.');if(wl.includes(sym))return alert(sym+' already in watchlist.');wl.push(sym);save();alert(sym+' added!');}
+function confirmWL(){const s=document.getElementById('wl-inp').value.trim().toUpperCase();if(!s)return;if(!wl.includes(s)){wl.push(s);save();}closeMo('wl-mo');loadWLPrices();}
 function removeWL(s){wl=wl.filter(w=>w!==s);save();loadWLPrices();}
 async function loadWLPrices(){
   const el=document.getElementById('wl-list');
@@ -672,7 +906,7 @@ async function loadWLPrices(){
   }
 }
 async function loadSym(s){
-  go('analyzer');document.getElementById('inp').value=s;sym=s;
+  go('analyzer');document.getElementById('inp').value=s;sym=s;lastAI=null;
   showMsg(`<div style="padding:2rem;text-align:center;"><div class="sp"></div><br><br><span style="color:var(--t3);">Loading ${s}...</span></div>`);
   const data=await fetchStock(s);
   if(!data||!data.closes.length){showMsg(`<div class="em">Could not load ${s}. Try again.</div>`);return;}
