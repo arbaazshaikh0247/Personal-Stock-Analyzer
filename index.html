@@ -97,7 +97,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
   <button class="tb" onclick="go('notes')">📝 Notes</button>
 </nav>
 <main class="mn">
-
+ 
   <div id="analyzer" class="pg active">
     <div class="sr">
       <input id="inp" type="text" placeholder="NSE symbol — RELIANCE, TCS, INFY, HDFCBANK, WIPRO, ITC..." onkeydown="if(event.key==='Enter')doSearch()">
@@ -159,7 +159,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
       </div>
     </div>
   </div>
-
+ 
   <div id="watchlist" class="pg">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <h3 style="font-size:16px;font-weight:600;">Watchlist <span id="wl-c" style="font-size:13px;font-weight:400;color:var(--t3);"></span></h3>
@@ -167,7 +167,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     </div>
     <div class="cd cf" id="wl-list"><div class="em">No stocks yet.</div></div>
   </div>
-
+ 
   <div id="screener" class="pg">
     <div style="margin-bottom:1rem;"><h3 style="font-size:16px;font-weight:600;margin-bottom:.3rem;">Stock Screener</h3><p style="font-size:13px;color:var(--t3);">Screens Nifty 50 stocks.</p></div>
     <div class="cd">
@@ -184,14 +184,14 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     </div>
     <div id="sc-out"></div>
   </div>
-
+ 
   <div id="notes" class="pg">
     <h3 style="font-size:16px;font-weight:600;margin-bottom:1rem;">My Stock Notes</h3>
     <div id="all-notes"></div>
   </div>
-
+ 
 </main>
-
+ 
 <div class="mo" id="wl-mo">
   <div class="md">
     <div class="mdt">Add to Watchlist</div>
@@ -199,16 +199,16 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     <div class="mda"><button class="btn bp" onclick="confirmWL()">Add</button><button class="btn" onclick="closeMo()">Cancel</button></div>
   </div>
 </div>
-
+ 
 <script>
 let wl    = JSON.parse(localStorage.getItem('hh_wl6')  || '[]');
 let notes = JSON.parse(localStorage.getItem('hh_nt6')  || '{}');
 let sym   = '';
 let full  = null;
 let CHS   = {};
-
+ 
 function save(){ localStorage.setItem('hh_wl6',JSON.stringify(wl)); localStorage.setItem('hh_nt6',JSON.stringify(notes)); }
-
+ 
 // ── FETCH via our own Vercel backend API ──
 async function fetchStock(symbol){
   try {
@@ -218,7 +218,7 @@ async function fetchStock(symbol){
   } catch(e){}
   return null;
 }
-
+ 
 function parseYahoo(data){
   const res  = data.chart.result[0];
   const meta = res.meta;
@@ -238,7 +238,7 @@ function parseYahoo(data){
     meta
   };
 }
-
+ 
 function go(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
@@ -247,7 +247,7 @@ function go(id){
   if(id==='watchlist') loadWLPrices();
   if(id==='notes') renderNotes();
 }
-
+ 
 async function doSearch(){
   const raw = document.getElementById('inp').value.trim().toUpperCase().replace(/\.(NS|BO)$/,'');
   if(!raw) return;
@@ -261,15 +261,15 @@ async function doSearch(){
   full = data;
   renderView(data, 132);
 }
-
+ 
 function showMsg(html){
   document.getElementById('a-empty').innerHTML = html;
   document.getElementById('a-empty').style.display = 'block';
   document.getElementById('a-main').style.display  = 'none';
 }
-
+ 
 function sliceD(d,n){ const s=Math.max(0,d.closes.length-n); return{dates:d.dates.slice(s),closes:d.closes.slice(s),highs:d.highs.slice(s),lows:d.lows.slice(s),volumes:d.volumes.slice(s)}; }
-
+ 
 function renderView(d,days){
   const sd=sliceD(d,days);
   const cls=d.closes, price=cls[cls.length-1];
@@ -277,14 +277,14 @@ function renderView(d,days){
   const chg=price-prev, chgP=(chg/prev)*100;
   const w52h=d.meta?.fiftyTwoWeekHigh||Math.max(...cls.slice(-252));
   const w52l=d.meta?.fiftyTwoWeekLow||Math.min(...cls.slice(-252));
-
+ 
   document.getElementById('s-sym').textContent  =sym;
   document.getElementById('s-name').textContent =d.meta?.longName||d.meta?.shortName||sym;
   document.getElementById('s-price').textContent='₹'+price.toFixed(2);
   const ce=document.getElementById('s-chg');
   ce.textContent=(chg>=0?'+':'')+chg.toFixed(2)+' ('+(chgP>=0?'+':'')+chgP.toFixed(2)+'%)';
   ce.className=chg>=0?'up':'dn';
-
+ 
   const avgV=d.volumes.slice(-10).reduce((a,b)=>a+b,0)/10;
   document.getElementById('s-met').innerHTML=`
     <div class="mt"><div class="ml">52W High</div><div class="mv ${price>=w52h*.97?'up':''}">₹${w52h.toFixed(0)}</div></div>
@@ -301,7 +301,7 @@ function renderView(d,days){
   document.getElementById('a-empty').style.display='none';
   document.getElementById('a-main').style.display='block';
 }
-
+ 
 function renderFund(meta){
   const el=document.getElementById('s-fund');
   if(!meta){el.innerHTML='<div style="font-size:13px;color:var(--t3);">Not available.</div>';return;}
@@ -318,14 +318,14 @@ function renderFund(meta){
     ${fi('Currency',meta.currency||'INR')}
   `;
 }
-
+ 
 const SMA=(d,p)=>d.map((v,i)=>i<p-1?null:d.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);
 const EMA=(d,p)=>{const k=2/(p+1);return d.reduce((a,v,i)=>{a.push(i===0?v:v*k+a[i-1]*(1-k));return a;},[]);};
 function RSI(d,p=14){const r=Array(p).fill(null);for(let i=p;i<d.length;i++){let g=0,l=0;for(let j=i-p;j<i;j++){const x=d[j+1]-d[j];x>0?g+=x:l-=x;}const ag=g/p,al=l/p;r.push(al===0?100:100-(100/(1+ag/al)));}return r;}
 function MACD(d){const m=EMA(d,12).map((v,i)=>v-EMA(d,26)[i]);const s=EMA(m,9);return{m,s,h:m.map((v,i)=>v-s[i])};}
 function BB(d,p=20,x=2){const sm=SMA(d,p);return d.map((v,i)=>{if(i<p-1)return{u:null,l:null};const sl=d.slice(i-p+1,i+1),mean=sm[i],std=Math.sqrt(sl.reduce((a,b)=>a+(b-mean)**2,0)/p);return{u:mean+x*std,l:mean-x*std};});}
 function ATR(hi,lo,cls,p=14){const tr=hi.map((h,i)=>i===0?h-lo[i]:Math.max(h-lo[i],Math.abs(h-cls[i-1]),Math.abs(lo[i]-cls[i-1])));return tr.slice(-p).reduce((a,b)=>a+b,0)/p;}
-
+ 
 function buildCharts(d){
   const cls=d.closes,hi=d.highs,lo=d.lows,vol=d.volumes;
   const labels=d.dates.map(dt=>{const p=dt.split('-');return p[2]+'/'+p[1];});
@@ -365,13 +365,13 @@ function buildCharts(d){
   document.getElementById('macd-r').innerHTML=`MACD: <strong style="color:${lm>ls?'var(--green)':'var(--red)'}">${lm>ls?'Bullish':'Bearish'}</strong> — Line ${lm.toFixed(2)} / Signal ${ls.toFixed(2)}`;
   window._ind={cls,hi:d.highs,lo:d.lows,vol:d.volumes,ma20,ma50,ma200,bbv,rv,mv};
 }
-
+ 
 function tf(days,btn){
   document.querySelectorAll('.tfb').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   if(full) buildCharts(sliceD(full,days));
 }
-
+ 
 function runAI(){
   const btn=document.getElementById('ai-btn');const box=document.getElementById('ai-out');
   const ind=window._ind;if(!ind)return;
@@ -422,7 +422,7 @@ function runAI(){
     <div style="font-size:11px;color:var(--t3);margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--border);">⚠️ Technical analysis only. Not financial advice.</div>
   </div>`;
 }
-
+ 
 function addWL(){
   if(!sym){document.getElementById('wl-inp').value='';document.getElementById('wl-mo').classList.add('open');return;}
   if(wl.length>=20)return alert('Watchlist full (max 20).');
@@ -437,7 +437,7 @@ function confirmWL(){
 function closeMo(){document.getElementById('wl-mo').classList.remove('open');}
 document.getElementById('wl-mo').addEventListener('click',e=>{if(e.target===e.currentTarget)closeMo();});
 function removeWL(s){wl=wl.filter(w=>w!==s);save();loadWLPrices();}
-
+ 
 async function loadWLPrices(){
   const el=document.getElementById('wl-list');
   document.getElementById('wl-c').textContent=`(${wl.length}/20)`;
@@ -463,7 +463,7 @@ async function loadWLPrices(){
     row.onclick=()=>loadSym(s);
   }
 }
-
+ 
 async function loadSym(s){
   go('analyzer');
   document.getElementById('inp').value=s;sym=s;
@@ -472,9 +472,9 @@ async function loadSym(s){
   if(!data||!data.closes.length){showMsg(`<div class="em">Could not load ${s}. Try again.</div>`);return;}
   full=data;renderView(data,132);
 }
-
+ 
 const NIFTY=['RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','ITC','WIPRO','SBIN','LT','AXISBANK','BAJFINANCE','KOTAKBANK','MARUTI','TITAN','SUNPHARMA'];
-
+ 
 async function runScreener(){
   const af=[...document.querySelectorAll('.fc.active')].map(b=>b.dataset.f);
   if(!af.length)return alert('Select at least one filter.');
@@ -511,7 +511,7 @@ async function runScreener(){
       <td><button class="btn bs bp" onclick="loadSym('${r.s}')">Analyse →</button></td>
     </tr>`).join('')+'</tbody></table></div>';
 }
-
+ 
 function saveNote(){
   if(!sym)return;
   notes[sym]=document.getElementById('s-note').value;save();
@@ -532,9 +532,10 @@ function renderNotes(){
     <div style="font-size:13px;color:var(--t2);line-height:1.7;white-space:pre-wrap;">${notes[s]}</div>
   </div>`).join('');
 }
-
+ 
 function fmtV(v){if(!v)return'—';if(v>=1e7)return(v/1e7).toFixed(1)+'Cr';if(v>=1e5)return(v/1e5).toFixed(1)+'L';if(v>=1e3)return(v/1e3).toFixed(0)+'K';return v.toFixed(0);}
 function fmtCr(v){if(v>=1e12)return(v/1e12).toFixed(1)+'L Cr';if(v>=1e9)return(v/1e9).toFixed(0)+' Cr';return(v/1e7).toFixed(0)+' L';}
 </script>
 </body>
 </html>
+ 
