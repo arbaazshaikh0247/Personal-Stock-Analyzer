@@ -98,7 +98,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
 </nav>
 <main class="mn">
 
-  <!-- ANALYZER -->
   <div id="analyzer" class="pg active">
     <div class="sr">
       <input id="inp" type="text" placeholder="NSE symbol — RELIANCE, TCS, INFY, HDFCBANK, WIPRO, ITC..." onkeydown="if(event.key==='Enter')doSearch()">
@@ -108,8 +107,7 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     <div id="a-empty" class="cd" style="text-align:center;padding:3rem;">
       <div style="font-size:2.5rem;margin-bottom:1rem;">📊</div>
       <div style="font-size:15px;font-weight:500;margin-bottom:.5rem;">Search any NSE stock</div>
-      <div style="font-size:13px;color:var(--t3);margin-bottom:.5rem;">RELIANCE · TCS · INFY · HDFCBANK · ITC · WIPRO · TATAMOTORS · SBIN</div>
-      <div style="font-size:12px;color:var(--t3);">Uses NSE India data — no API key needed</div>
+      <div style="font-size:13px;color:var(--t3);">RELIANCE · TCS · INFY · HDFCBANK · ITC · WIPRO · TATAMOTORS · SBIN</div>
     </div>
     <div id="a-main" style="display:none;">
       <div class="cd">
@@ -162,7 +160,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     </div>
   </div>
 
-  <!-- WATCHLIST -->
   <div id="watchlist" class="pg">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <h3 style="font-size:16px;font-weight:600;">Watchlist <span id="wl-c" style="font-size:13px;font-weight:400;color:var(--t3);"></span></h3>
@@ -171,9 +168,8 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     <div class="cd cf" id="wl-list"><div class="em">No stocks yet.</div></div>
   </div>
 
-  <!-- SCREENER -->
   <div id="screener" class="pg">
-    <div style="margin-bottom:1rem;"><h3 style="font-size:16px;font-weight:600;margin-bottom:.3rem;">Stock Screener</h3><p style="font-size:13px;color:var(--t3);">Screens Nifty 50 stocks using NSE data.</p></div>
+    <div style="margin-bottom:1rem;"><h3 style="font-size:16px;font-weight:600;margin-bottom:.3rem;">Stock Screener</h3><p style="font-size:13px;color:var(--t3);">Screens Nifty 50 stocks.</p></div>
     <div class="cd">
       <div class="ct">Filters</div>
       <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;">
@@ -189,7 +185,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
     <div id="sc-out"></div>
   </div>
 
-  <!-- NOTES -->
   <div id="notes" class="pg">
     <h3 style="font-size:16px;font-weight:600;margin-bottom:1rem;">My Stock Notes</h3>
     <div id="all-notes"></div>
@@ -197,7 +192,6 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
 
 </main>
 
-<!-- MODAL -->
 <div class="mo" id="wl-mo">
   <div class="md">
     <div class="mdt">Add to Watchlist</div>
@@ -207,102 +201,22 @@ tr:last-child td{border-bottom:none;}tr:hover td{background:var(--s2);}
 </div>
 
 <script>
-let wl    = JSON.parse(localStorage.getItem('hh_wl5')  || '[]');
-let notes = JSON.parse(localStorage.getItem('hh_nt5')  || '{}');
+let wl    = JSON.parse(localStorage.getItem('hh_wl6')  || '[]');
+let notes = JSON.parse(localStorage.getItem('hh_nt6')  || '{}');
 let sym   = '';
 let full  = null;
 let CHS   = {};
 
-function save(){ localStorage.setItem('hh_wl5',JSON.stringify(wl)); localStorage.setItem('hh_nt5',JSON.stringify(notes)); }
+function save(){ localStorage.setItem('hh_wl6',JSON.stringify(wl)); localStorage.setItem('hh_nt6',JSON.stringify(notes)); }
 
-// ── NSE INDIA FETCH ──
-// NSE India has a public API used by their own website - no key needed
-// We use a lightweight CORS approach with their chart data endpoint
-
-async function fetchNSE(symbol, range='1y'){
-  // NSE chart data endpoint
-  const rangeMap = { '1m':'1month', '3m':'3month', '6m':'6month', '1y':'1year' };
-  const url = `https://charting.nseindia.com/Charts/GetEQMasters?symbol=${symbol}&start=2020-01-01&end=2025-12-31&type=EQ`;
-  
-  // Try multiple approaches
-  const approaches = [
-    // Approach 1: NSE historical data API
-    async () => {
-      const r = await fetch(`https://www.nseindia.com/api/historical/cm/equity?symbol=${encodeURIComponent(symbol)}&series=["EQ"]&from=2024-01-01&to=2025-12-31`, {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.nseindia.com' }
-      });
-      return await r.json();
-    },
-    // Approach 2: NSE quote API  
-    async () => {
-      const r = await fetch(`https://www.nseindia.com/api/quote-equity?symbol=${encodeURIComponent(symbol)}`, {
-        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://www.nseindia.com' }
-      });
-      return await r.json();
-    }
-  ];
-  
-  for(const fn of approaches){
-    try{ const d = await fn(); if(d) return d; } catch(e){}
-  }
-  return null;
-}
-
-// ── MAIN DATA FETCH using multiple sources ──
+// ── FETCH via our own Vercel backend API ──
 async function fetchStock(symbol){
-  // Source 1: Stooq (no CORS issues, free, covers Indian stocks)
   try {
-    const r = await fetch(`https://stooq.com/q/d/l/?s=${symbol.toLowerCase()}.in&i=d`);
-    const text = await r.text();
-    if(text && !text.includes('No data') && text.includes(',')) {
-      return parseStooq(text, symbol);
-    }
-  } catch(e){}
-
-  // Source 2: Frankfurter / Open exchange approach for price
-  // Source 3: Use a reliable financial data CDN
-  try {
-    const r = await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${symbol}.NS?range=1y&interval=1d`);
+    const r = await fetch(`/api/stock?symbol=${encodeURIComponent(symbol)}`);
     const d = await r.json();
     if(d?.chart?.result?.[0]) return parseYahoo(d);
   } catch(e){}
-
-  try {
-    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}.BO?range=1y&interval=1d`);
-    const d = await r.json();
-    if(d?.chart?.result?.[0]) return parseYahoo(d);
-  } catch(e){}
-
   return null;
-}
-
-function parseStooq(csv, symbol){
-  const lines = csv.trim().split('\n');
-  if(lines.length < 2) return null;
-  // CSV: Date,Open,High,Low,Close,Volume
-  const dates=[], opens=[], highs=[], lows=[], closes=[], volumes=[];
-  for(let i=1; i<lines.length; i++){
-    const p = lines[i].split(',');
-    if(p.length < 5) continue;
-    dates.push(p[0].trim());
-    opens.push(parseFloat(p[1]));
-    highs.push(parseFloat(p[2]));
-    lows.push(parseFloat(p[3]));
-    closes.push(parseFloat(p[4]));
-    volumes.push(p[5] ? parseInt(p[5]) : 0);
-  }
-  if(!closes.length) return null;
-  const last = closes[closes.length-1];
-  const prev = closes[closes.length-2] || last;
-  return {
-    symbol, dates, opens, highs, lows, closes, volumes,
-    meta: {
-      symbol, longName: symbol+' (NSE)',
-      regularMarketPrice: last, chartPreviousClose: prev,
-      fiftyTwoWeekHigh: Math.max(...closes.slice(-252)),
-      fiftyTwoWeekLow:  Math.min(...closes.slice(-252)),
-    }
-  };
 }
 
 function parseYahoo(data){
@@ -316,7 +230,6 @@ function parseYahoo(data){
   const volumes = q.volume || [];
   const idx = ts.map((_,i)=>i).filter(i=>closes[i]!=null);
   return {
-    symbol: meta.symbol,
     dates:   idx.map(i=>new Date(ts[i]*1000).toISOString().split('T')[0]),
     closes:  idx.map(i=>closes[i]),
     highs:   idx.map(i=>highs[i]||closes[i]),
@@ -326,7 +239,6 @@ function parseYahoo(data){
   };
 }
 
-// ── NAV ──
 function go(id){
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
@@ -336,31 +248,16 @@ function go(id){
   if(id==='notes') renderNotes();
 }
 
-// ── SEARCH ──
 async function doSearch(){
-  const raw = document.getElementById('inp').value.trim().toUpperCase().replace(/\.(NS|BO|IN)$/,'');
+  const raw = document.getElementById('inp').value.trim().toUpperCase().replace(/\.(NS|BO)$/,'');
   if(!raw) return;
   sym = raw;
   showMsg(`<div style="padding:2rem;text-align:center;"><div class="sp"></div><br><br><span style="color:var(--t3);">Loading ${raw}...</span></div>`);
-
   const data = await fetchStock(raw);
-
-  if(!data || !data.closes || !data.closes.length){
-    showMsg(`<div class="em">
-      <strong style="font-size:15px;">Could not load "${raw}"</strong><br><br>
-      This is a network/browser restriction — the data source is being blocked.<br><br>
-      <strong>Best solution that always works:</strong><br>
-      Use this app on <strong style="color:var(--accent);">mobile data (4G/5G)</strong> — not WiFi.<br>
-      Most home and office WiFi routers block financial data APIs.<br><br>
-      <strong>Other things to try:</strong><br>
-      • Disable any VPN or proxy<br>
-      • Try a different browser (Chrome works best)<br>
-      • Check the symbol is correct: RELIANCE not RELIANCE.NS<br><br>
-      <span style="color:var(--t3);font-size:12px;">Common symbols: RELIANCE, TCS, INFY, HDFCBANK, ITC, WIPRO, SBIN, TATAMOTORS</span>
-    </div>`);
+  if(!data||!data.closes.length){
+    showMsg(`<div class="em"><strong>Could not load "${raw}"</strong><br><br>Make sure you typed the correct NSE symbol.<br><br>Examples: RELIANCE, TCS, INFY, HDFCBANK, ITC, WIPRO, SBIN, TATAMOTORS</div>`);
     return;
   }
-
   full = data;
   renderView(data, 132);
 }
@@ -371,30 +268,25 @@ function showMsg(html){
   document.getElementById('a-main').style.display  = 'none';
 }
 
-function sliceD(d, n){
-  const s = Math.max(0, d.closes.length - n);
-  return { dates:d.dates.slice(s), closes:d.closes.slice(s), highs:d.highs.slice(s), lows:d.lows.slice(s), volumes:d.volumes.slice(s) };
-}
+function sliceD(d,n){ const s=Math.max(0,d.closes.length-n); return{dates:d.dates.slice(s),closes:d.closes.slice(s),highs:d.highs.slice(s),lows:d.lows.slice(s),volumes:d.volumes.slice(s)}; }
 
-function renderView(d, days){
-  const sd    = sliceD(d, days);
-  const cls   = d.closes;
-  const price = cls[cls.length-1];
-  const prev  = d.meta?.chartPreviousClose || cls[cls.length-2] || price;
-  const chg   = price - prev;
-  const chgP  = (chg/prev)*100;
-  const w52h  = d.meta?.fiftyTwoWeekHigh || Math.max(...cls.slice(-252));
-  const w52l  = d.meta?.fiftyTwoWeekLow  || Math.min(...cls.slice(-252));
+function renderView(d,days){
+  const sd=sliceD(d,days);
+  const cls=d.closes, price=cls[cls.length-1];
+  const prev=d.meta?.chartPreviousClose||cls[cls.length-2]||price;
+  const chg=price-prev, chgP=(chg/prev)*100;
+  const w52h=d.meta?.fiftyTwoWeekHigh||Math.max(...cls.slice(-252));
+  const w52l=d.meta?.fiftyTwoWeekLow||Math.min(...cls.slice(-252));
 
-  document.getElementById('s-sym').textContent   = sym;
-  document.getElementById('s-name').textContent  = d.meta?.longName || d.meta?.shortName || sym;
-  document.getElementById('s-price').textContent = '₹'+price.toFixed(2);
-  const ce = document.getElementById('s-chg');
-  ce.textContent = (chg>=0?'+':'')+chg.toFixed(2)+' ('+(chgP>=0?'+':'')+chgP.toFixed(2)+'%)';
-  ce.className = chg>=0?'up':'dn';
+  document.getElementById('s-sym').textContent  =sym;
+  document.getElementById('s-name').textContent =d.meta?.longName||d.meta?.shortName||sym;
+  document.getElementById('s-price').textContent='₹'+price.toFixed(2);
+  const ce=document.getElementById('s-chg');
+  ce.textContent=(chg>=0?'+':'')+chg.toFixed(2)+' ('+(chgP>=0?'+':'')+chgP.toFixed(2)+'%)';
+  ce.className=chg>=0?'up':'dn';
 
-  const avgV = d.volumes.slice(-10).reduce((a,b)=>a+b,0)/10;
-  document.getElementById('s-met').innerHTML = `
+  const avgV=d.volumes.slice(-10).reduce((a,b)=>a+b,0)/10;
+  document.getElementById('s-met').innerHTML=`
     <div class="mt"><div class="ml">52W High</div><div class="mv ${price>=w52h*.97?'up':''}">₹${w52h.toFixed(0)}</div></div>
     <div class="mt"><div class="ml">52W Low</div><div class="mv">₹${w52l.toFixed(0)}</div></div>
     <div class="mt"><div class="ml">Today High</div><div class="mv">₹${d.highs[d.highs.length-1].toFixed(2)}</div></div>
@@ -402,33 +294,31 @@ function renderView(d, days){
     <div class="mt"><div class="ml">Volume</div><div class="mv" style="font-size:14px;">${fmtV(d.volumes[d.volumes.length-1])}</div></div>
     <div class="mt"><div class="ml">Avg Vol 10D</div><div class="mv" style="font-size:14px;">${fmtV(avgV)}</div></div>
   `;
-
   renderFund(d.meta);
   buildCharts(sd);
-  document.getElementById('s-note').value = notes[sym]||'';
+  document.getElementById('s-note').value=notes[sym]||'';
   document.getElementById('ai-out').style.display='none';
   document.getElementById('a-empty').style.display='none';
   document.getElementById('a-main').style.display='block';
 }
 
 function renderFund(meta){
-  const el = document.getElementById('s-fund');
-  if(!meta){ el.innerHTML='<div style="font-size:13px;color:var(--t3);">Not available.</div>'; return; }
-  const fi = (l,v,c='var(--text)') => `<div class="fi"><div class="fll">${l}</div><div class="fv" style="color:${c};">${v||'—'}</div></div>`;
+  const el=document.getElementById('s-fund');
+  if(!meta){el.innerHTML='<div style="font-size:13px;color:var(--t3);">Not available.</div>';return;}
+  const fi=(l,v,c='var(--text)')=>`<div class="fi"><div class="fll">${l}</div><div class="fv" style="color:${c};">${v||'—'}</div></div>`;
   const pe=meta.trailingPE||meta.forwardPE;
   el.innerHTML=`
-    ${fi('P/E Ratio', pe?pe.toFixed(1):'—', pe?(pe<15?'var(--green)':pe>35?'var(--red)':'var(--text)'):'var(--t3)')}
-    ${fi('EPS (TTM)', meta.epsTrailingTwelveMonths?'₹'+meta.epsTrailingTwelveMonths.toFixed(2):'—')}
-    ${fi('Market Cap', meta.marketCap?fmtCr(meta.marketCap):'—')}
-    ${fi('52W High', meta.fiftyTwoWeekHigh?'₹'+meta.fiftyTwoWeekHigh.toFixed(0):'—')}
-    ${fi('52W Low', meta.fiftyTwoWeekLow?'₹'+meta.fiftyTwoWeekLow.toFixed(0):'—')}
-    ${fi('Div Yield', meta.dividendYield?(meta.dividendYield*100).toFixed(2)+'%':'—')}
-    ${fi('Beta', meta.beta?meta.beta.toFixed(2):'—')}
-    ${fi('Currency', meta.currency||'INR')}
+    ${fi('P/E Ratio',pe?pe.toFixed(1):'—',pe?(pe<15?'var(--green)':pe>35?'var(--red)':'var(--text)'):'var(--t3)')}
+    ${fi('EPS (TTM)',meta.epsTrailingTwelveMonths?'₹'+meta.epsTrailingTwelveMonths.toFixed(2):'—')}
+    ${fi('Market Cap',meta.marketCap?fmtCr(meta.marketCap):'—')}
+    ${fi('52W High',meta.fiftyTwoWeekHigh?'₹'+meta.fiftyTwoWeekHigh.toFixed(0):'—')}
+    ${fi('52W Low',meta.fiftyTwoWeekLow?'₹'+meta.fiftyTwoWeekLow.toFixed(0):'—')}
+    ${fi('Div Yield',meta.dividendYield?(meta.dividendYield*100).toFixed(2)+'%':'—')}
+    ${fi('Beta',meta.beta?meta.beta.toFixed(2):'—')}
+    ${fi('Currency',meta.currency||'INR')}
   `;
 }
 
-// ── TECHNICALS ──
 const SMA=(d,p)=>d.map((v,i)=>i<p-1?null:d.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p);
 const EMA=(d,p)=>{const k=2/(p+1);return d.reduce((a,v,i)=>{a.push(i===0?v:v*k+a[i-1]*(1-k));return a;},[]);};
 function RSI(d,p=14){const r=Array(p).fill(null);for(let i=p;i<d.length;i++){let g=0,l=0;for(let j=i-p;j<i;j++){const x=d[j+1]-d[j];x>0?g+=x:l-=x;}const ag=g/p,al=l/p;r.push(al===0?100:100-(100/(1+ag/al)));}return r;}
@@ -441,9 +331,7 @@ function buildCharts(d){
   const labels=d.dates.map(dt=>{const p=dt.split('-');return p[2]+'/'+p[1];});
   const ma20=SMA(cls,20),ma50=SMA(cls,50),ma200=SMA(cls,Math.min(200,cls.length));
   const bbv=BB(cls);const rv=RSI(cls);const mv=MACD(cls);
-
   Object.values(CHS).forEach(c=>c&&c.destroy());CHS={};
-
   CHS.p=new Chart(document.getElementById('pc'),{type:'line',data:{labels,datasets:[
     {label:'Price',data:cls,borderColor:'#4f8ef7',backgroundColor:'rgba(79,142,247,.08)',borderWidth:2,fill:true,pointRadius:0,tension:.3,order:1},
     {label:'MA20',data:ma20,borderColor:'#f59e0b',borderWidth:1.5,pointRadius:0,tension:.3,fill:false,order:2},
@@ -455,11 +343,9 @@ function buildCharts(d){
     plugins:{legend:{display:true,labels:{color:'#9196b0',font:{size:10},boxWidth:10,padding:6}},tooltip:{backgroundColor:'#1a1d27',borderColor:'#2d3148',borderWidth:1,titleColor:'#e8e9f0',bodyColor:'#9196b0',callbacks:{label:c=>c.raw!=null?' ₹'+c.raw.toFixed(2):''}}},
     scales:{x:{ticks:{color:'#5a5f7a',font:{size:10},maxTicksLimit:10},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#5a5f7a',font:{size:10},callback:v=>'₹'+v.toFixed(0)},grid:{color:'rgba(255,255,255,.04)'}}}}
   });
-
   CHS.v=new Chart(document.getElementById('vc'),{type:'bar',data:{labels,datasets:[{data:vol,backgroundColor:cls.map((c,i)=>i>0&&c>=cls[i-1]?'rgba(34,197,94,.5)':'rgba(239,68,68,.5)'),borderRadius:2}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmtV(c.raw)}}},scales:{x:{display:false},y:{ticks:{color:'#5a5f7a',font:{size:10},callback:v=>fmtV(v)},grid:{color:'rgba(255,255,255,.04)'}}}}
   });
-
   const lr=rv.filter(v=>v!=null).slice(-1)[0]||50;
   const rc=lr<30?'#22c55e':lr>70?'#ef4444':'#4f8ef7';
   CHS.r=new Chart(document.getElementById('rc'),{type:'line',data:{labels,datasets:[
@@ -469,7 +355,6 @@ function buildCharts(d){
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{min:0,max:100,ticks:{color:'#5a5f7a',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}}}}
   });
   document.getElementById('rsi-r').innerHTML=`RSI: <strong style="color:${rc}">${lr.toFixed(1)}</strong> — ${lr<30?'<span class="bdg bg">Oversold</span>':lr>70?'<span class="bdg br">Overbought</span>':'<span class="bdg bb">Neutral</span>'}`;
-
   const lm=mv.m[mv.m.length-1]||0,ls=mv.s[mv.s.length-1]||0;
   CHS.m=new Chart(document.getElementById('mc'),{type:'bar',data:{labels,datasets:[
     {data:mv.h,backgroundColor:mv.h.map(v=>v>=0?'rgba(34,197,94,.6)':'rgba(239,68,68,.6)'),borderRadius:2,order:1},
@@ -478,7 +363,6 @@ function buildCharts(d){
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{color:'#5a5f7a',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}}}}
   });
   document.getElementById('macd-r').innerHTML=`MACD: <strong style="color:${lm>ls?'var(--green)':'var(--red)'}">${lm>ls?'Bullish':'Bearish'}</strong> — Line ${lm.toFixed(2)} / Signal ${ls.toFixed(2)}`;
-
   window._ind={cls,hi:d.highs,lo:d.lows,vol:d.volumes,ma20,ma50,ma200,bbv,rv,mv};
 }
 
@@ -488,7 +372,6 @@ function tf(days,btn){
   if(full) buildCharts(sliceD(full,days));
 }
 
-// ── AI ──
 function runAI(){
   const btn=document.getElementById('ai-btn');const box=document.getElementById('ai-out');
   const ind=window._ind;if(!ind)return;
@@ -522,7 +405,7 @@ function runAI(){
   const v=sc>=6?'BUY':sc>=3?'HOLD':'AVOID';
   const vc=v==='BUY'?'vbu':v==='HOLD'?'vho':'vav';
   const vco=v==='BUY'?'var(--green)':v==='HOLD'?'var(--amber)':'var(--red)';
-  const vr={BUY:`Strong alignment — trend, momentum and volume support entry. R:R of ${rr}:1 is favorable.`,HOLD:`Mixed signals. Not enough confirmation for a confident entry. Watch for clearer setup.`,AVOID:`Indicators mostly negative. Wait for conditions to improve.`};
+  const vr={BUY:`Strong alignment — trend, momentum and volume support entry. R:R of ${rr}:1 is favorable.`,HOLD:`Mixed signals. Not enough confirmation for confident entry. Watch for clearer setup.`,AVOID:`Indicators mostly negative. Wait for conditions to improve.`};
   btn.disabled=false;btn.innerHTML='🤖 AI Analysis';
   box.style.display='block';
   box.innerHTML=`<div class="aib">
@@ -540,7 +423,6 @@ function runAI(){
   </div>`;
 }
 
-// ── WATCHLIST ──
 function addWL(){
   if(!sym){document.getElementById('wl-inp').value='';document.getElementById('wl-mo').classList.add('open');return;}
   if(wl.length>=20)return alert('Watchlist full (max 20).');
@@ -560,17 +442,14 @@ async function loadWLPrices(){
   const el=document.getElementById('wl-list');
   document.getElementById('wl-c').textContent=`(${wl.length}/20)`;
   if(!wl.length){el.innerHTML='<div class="em">No stocks yet.</div>';return;}
-  el.innerHTML=wl.map(s=>`<div class="wi" id="wi-${s}" onclick="loadSym('${s}')">
+  el.innerHTML=wl.map(s=>`<div class="wi" id="wi-${s}">
     <span class="wsm">${s}</span><span style="flex:1;font-size:12px;color:var(--t3);"><span class="sp"></span></span>
     <button class="btn bs bd" onclick="event.stopPropagation();removeWL('${s}')">✕</button>
   </div>`).join('');
   for(const s of wl){
     const d=await fetchStock(s);
-    const row=document.getElementById('wi-'+s);
-    if(!row)continue;
-    if(!d||!d.closes.length){
-      row.querySelector('span:nth-child(2)').textContent='Could not load';continue;
-    }
+    const row=document.getElementById('wi-'+s);if(!row)continue;
+    if(!d||!d.closes.length){row.querySelector('span:nth-child(2)').textContent='Could not load';continue;}
     const price=d.closes[d.closes.length-1];
     const prev=d.meta?.chartPreviousClose||d.closes[d.closes.length-2]||price;
     const chg=price-prev,chgP=(chg/prev)*100;
@@ -587,23 +466,20 @@ async function loadWLPrices(){
 
 async function loadSym(s){
   go('analyzer');
-  document.getElementById('inp').value=s;
-  sym=s;
+  document.getElementById('inp').value=s;sym=s;
   showMsg(`<div style="padding:2rem;text-align:center;"><div class="sp"></div><br><br><span style="color:var(--t3);">Loading ${s}...</span></div>`);
   const data=await fetchStock(s);
   if(!data||!data.closes.length){showMsg(`<div class="em">Could not load ${s}. Try again.</div>`);return;}
-  full=data;
-  renderView(data,132);
+  full=data;renderView(data,132);
 }
 
-// ── SCREENER ──
 const NIFTY=['RELIANCE','TCS','HDFCBANK','INFY','ICICIBANK','ITC','WIPRO','SBIN','LT','AXISBANK','BAJFINANCE','KOTAKBANK','MARUTI','TITAN','SUNPHARMA'];
 
 async function runScreener(){
   const af=[...document.querySelectorAll('.fc.active')].map(b=>b.dataset.f);
   if(!af.length)return alert('Select at least one filter.');
   const el=document.getElementById('sc-out');
-  el.innerHTML='<div class="cd"><div style="padding:1.5rem;text-align:center;"><div class="sp"></div> Scanning Nifty 50 stocks...</div></div>';
+  el.innerHTML='<div class="cd"><div style="padding:1.5rem;text-align:center;"><div class="sp"></div> Scanning stocks...</div></div>';
   const res=[];
   for(const s of NIFTY){
     const d=await fetchStock(s);
@@ -622,9 +498,9 @@ async function runScreener(){
     if(af.includes('uptrend')&&!(price>ma200v&&chgP>0))pass=false;
     if(af.includes('downtrend')&&!(price<ma200v&&chgP<0))pass=false;
     if(pass)res.push({s,price,chgP,rsiV,w52h});
-    await new Promise(r=>setTimeout(r,400));
+    await new Promise(r=>setTimeout(r,300));
   }
-  if(!res.length){el.innerHTML='<div class="cd"><div class="em">No stocks matched. Try different filters.</div></div>';return;}
+  if(!res.length){el.innerHTML='<div class="cd"><div class="em">No stocks matched.</div></div>';return;}
   el.innerHTML='<div class="cd cf"><table><thead><tr><th>Symbol</th><th>Price</th><th>Change</th><th>RSI</th><th>52W High</th><th>Action</th></tr></thead><tbody>'+
     res.map(r=>`<tr>
       <td><strong style="color:var(--accent);font-family:'DM Mono',monospace;">${r.s}</strong></td>
@@ -636,7 +512,6 @@ async function runScreener(){
     </tr>`).join('')+'</tbody></table></div>';
 }
 
-// ── NOTES ──
 function saveNote(){
   if(!sym)return;
   notes[sym]=document.getElementById('s-note').value;save();
@@ -658,7 +533,6 @@ function renderNotes(){
   </div>`).join('');
 }
 
-// ── UTILS ──
 function fmtV(v){if(!v)return'—';if(v>=1e7)return(v/1e7).toFixed(1)+'Cr';if(v>=1e5)return(v/1e5).toFixed(1)+'L';if(v>=1e3)return(v/1e3).toFixed(0)+'K';return v.toFixed(0);}
 function fmtCr(v){if(v>=1e12)return(v/1e12).toFixed(1)+'L Cr';if(v>=1e9)return(v/1e9).toFixed(0)+' Cr';return(v/1e7).toFixed(0)+' L';}
 </script>
